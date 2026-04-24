@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Importar PIA · RoPA{% endblock %}
+{% block page_title %}📥 Importar Avaliação de Impacto à Proteção de Dados (PIA){% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row g-3">
+    <!-- Main content -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-cloud-upload me-2"></i> Importar PIA em Formato CNIL</h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info mb-4">
+            <strong>ℹ️ Informação:</strong> Importe Avaliações de Impacto à Proteção de Dados (PIA)
+            no formato padrão CNIL. As atividades serão automaticamente mapeadas para o padrão LGPD
+            e integradas ao seu Registro de Atividades de Tratamento.
+          </div>
+
+          <form method="post" enctype="multipart/form-data" novalidate>
+            <!-- File upload -->
+            <div class="mb-4">
+              <label class="form-label"><strong>Arquivo PIA (JSON)</strong> <span class="req">*</span></label>
+              <div class="input-group">
+                <input type="file" name="file" class="form-control" accept=".json" required>
+                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="popover"
+                        data-bs-trigger="hover" data-bs-content="Máximo 10MB. Deve conter um array 'atividades' com objetos PIA no formato CNIL.">
+                  <i class="bi bi-question-circle"></i>
+                </button>
+              </div>
+              <small class="text-muted">
+                Formato esperado: JSON com array <code>atividades</code> contendo objetos PIA CNIL.
+              </small>
+            </div>
+
+            <!-- Conflict resolution -->
+            <div class="mb-4">
+              <label class="form-label"><strong>Estratégia de Conflito</strong></label>
+              <p class="text-muted small mb-3">
+                Como proceder se uma atividade com o mesmo nome já existe no banco?
+              </p>
+
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="conflict_strategy"
+                       id="strategy_skip" value="skip" checked>
+                <label class="form-check-label" for="strategy_skip">
+                  <strong>Pular (Padrão)</strong>
+                  <br>
+                  <small class="text-muted">Ignora atividades duplicadas. Mantém os dados existentes.</small>
+                </label>
+              </div>
+
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="conflict_strategy"
+                       id="strategy_merge" value="merge">
+                <label class="form-check-label" for="strategy_merge">
+                  <strong>Mesclar</strong>
+                  <br>
+                  <small class="text-muted">Combina dados existentes com novos valores do PIA. Campos vazios na PIA não sobrescrevem dados existentes.</small>
+                </label>
+              </div>
+
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="conflict_strategy"
+                       id="strategy_overwrite" value="overwrite">
+                <label class="form-check-label" for="strategy_overwrite">
+                  <strong>Substituir</strong>
+                  <br>
+                  <small class="text-muted">Marca atividades antigas como inativas e cria novas. Mantém histórico de auditoria.</small>
+                </label>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+              <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                <i class="bi bi-x-circle me-1"></i> Cancelar
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-cloud-upload me-1"></i> Importar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar help -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i> Formato CNIL PIA</h6>
+        </div>
+        <div class="card-body small">
+          <p><strong>Estrutura esperada:</strong></p>
+          <pre class="bg-light p-2 rounded mb-3"><code>{
+  "atividades": [
+    {
+      "traitement": {
+        "nom": "string",
+        "finalites": ["string"]
+      },
+      "fondement_legal": {
+        "type": "string"
+      },
+      "personnes": {
+        "categories": ["string"]
+      },
+      "donnees": {
+        "type": ["string"],
+        "sensibles": boolean
+      },
+      ...
+    }
+  ]
+}</code></pre>
+
+          <hr>
+
+          <p><strong>Campos mapeados:</strong></p>
+          <ul class="list-unstyled mb-0">
+            <li><code>traitement.nom</code> → Nome da Atividade</li>
+            <li><code>traitement.finalites</code> → Finalidade</li>
+            <li><code>fondement_legal.type</code> → Base Legal</li>
+            <li><code>personnes.categories</code> → Categorias de Titulares</li>
+            <li><code>donnees.type</code> → Categorias de Dados</li>
+            <li><code>donnees.sensibles</code> → Dados Sensíveis</li>
+            <li><code>destinataires</code> → Destinatários</li>
+            <li><code>duree_conservation</code> → Prazo de Retenção</li>
+            <li><code>mesures_securite</code> → Medidas de Segurança</li>
+            <li><code>responsable.nom</code> → Unidade Controladora</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header bg-light">
+          <h6 class="mb-0"><i class="bi bi-gear me-1"></i> Base Legal LGPD</h6>
+        </div>
+        <div class="card-body small">
+          <p class="mb-2"><strong>Compatibilidade com GDPR/CNIL:</strong></p>
+          <ul class="list-unstyled mb-0">
+            <li><strong>I</strong> – Consentimento</li>
+            <li><strong>II</strong> – Obrigação Legal</li>
+            <li><strong>III</strong> – Políticas Públicas</li>
+            <li><strong>IV</strong> – Pesquisa</li>
+            <li><strong>V</strong> – Execução de Contrato</li>
+            <li><strong>VI</strong> – Exercício de Direitos</li>
+            <li><strong>VII</strong> – Proteção da Vida</li>
+            <li><strong>VIII</strong> – Tutela da Saúde</li>
+            <li><strong>IX</strong> – Legítimo Interesse</li>
+            <li><strong>X</strong> – Proteção do Crédito</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .form-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .form-card h6 {
+    margin-bottom: 1rem;
+    color: #1f3d7a;
+    font-weight: 600;
+  }
+  .req {
+    color: #dc3545;
+    font-weight: bold;
+  }
+</style>
+
+<script>
+  // Initialize Bootstrap popovers
+  document.addEventListener('DOMContentLoaded', function() {
+    const popovers = document.querySelectorAll('[data-bs-toggle="popover"]');
+    popovers.forEach(el => new bootstrap.Popover(el));
+  });
+</script>
+{% endblock %}

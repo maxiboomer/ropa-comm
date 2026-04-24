@@ -1,0 +1,142 @@
+#!/bin/bash
+# ropa-ctl — Ferramenta de gerenciamento do RoPA em produção
+# Uso: ropa-ctl {start|stop|restart|status|logs|url|install|uninstall}
+
+set -e
+
+LABEL_APP="ropa.app"
+LABEL_TUNNEL="ropa.tunnel"
+PLIST_APP="$HOME/Library/LaunchAgents/$LABEL_APP.plist"
+PLIST_TUNNEL="$HOME/Library/LaunchAgents/$LABEL_TUNNEL.plist"
+DATA_DIR="$HOME/Library/Application Support/ropa"
+LOG_DIR="$DATA_DIR/logs"
+UID_N=$(id -u)
+
+is_loaded() {
+    launchctl print "gui/$UID_N/$1" >/dev/null 2>&1
+}
+
+cmd_start() {
+    echo "→ Iniciando RoPA..."
+    if ! is_loaded "$LABEL_APP"; then
+        launchctl bootstrap "gui/$UID_N" "$PLIST_APP"
+        echo "  ✓ Gunicorn (app)"
+    else
+        echo "  · Gunicorn já rodando"
+    fi
+    if ! is_loaded "$LABEL_TUNNEL"; then
+        launchctl bootstrap "gui/$UID_N" "$PLIST_TUNNEL"
+        echo "  ✓ Cloudflare Tunnel"
+    else
+        echo "  · Tunnel já rodando"
+    fi
+    sleep 3
+    cmd_status
+}
+
+cmd_stop() {
+    echo "→ Parando RoPA..."
+    launchctl bootout "gui/$UID_N/$LABEL_TUNNEL" 2>/dev/null && echo "  ✓ Tunnel parado" || echo "  · Tunnel já parado"
+    launchctl bootout "gui/$UID_N/$LABEL_APP" 2>/dev/null && echo "  ✓ Gunicorn parado" || echo "  · Gunicorn já parado"
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 2
+    cmd_start
+}
+
+cmd_status() {
+    echo "=== RoPA Status ==="
+    if is_loaded "$LABEL_APP"; then
+        PID=$(launchctl print "gui/$UID_N/$LABEL_APP" 2>/dev/null | awk '/^[[:space:]]*pid = / {print $3}')
+        echo "  Gunicorn:  🟢 rodando (pid=$PID)  http://127.0.0.1:8000"
+    else
+        echo "  Gunicorn:  🔴 parado"
+    fi
+    if is_loaded "$LABEL_TUNNEL"; then
+        PID=$(launchctl print "gui/$UID_N/$LABEL_TUNNEL" 2>/dev/null | awk '/^[[:space:]]*pid = / {print $3}')
+        echo "  Tunnel:    🟢 rodando (pid=$PID)"
+    else
+        echo "  Tunnel:    🔴 parado"
+    fi
+    URL=$(cmd_url_quiet)
+    [ -n "$URL" ] && echo "  URL:       $URL"
+}
+
+cmd_url_quiet() {
+    # Procura a URL nas entradas mais recentes do stderr (onde o banner trycloudflare aparece)
+    # Usa o arquivo mais recentemente modificado primeiro
+    for f in "$LOG_DIR/cloudflared-stderr.log" "$LOG_DIR/cloudflared.log"; do
+        [ -f "$f" ] || continue
+        URL=$(grep -Eo "https://[-a-z0-9]+\.trycloudflare\.com" "$f" 2>/dev/null | tail -1)
+        [ -n "$URL" ] && { echo "$URL"; return; }
+    done
+}
+
+cmd_url() {
+    URL=$(cmd_url_quiet)
+    if [ -n "$URL" ]; then
+        echo "$URL"
+    else
+        echo "URL ainda não disponível. Aguarde o tunnel inicializar e rode 'ropa-ctl logs tunnel'"
+        exit 1
+    fi
+}
+
+cmd_logs() {
+    case "${1:-all}" in
+        app|gunicorn)
+            tail -f "$LOG_DIR"/gunicorn-*.log
+            ;;
+        tunnel|cloudflared)
+            tail -f "$LOG_DIR"/cloudflared*.log
+            ;;
+        *)
+            tail -f "$LOG_DIR"/*.log
+            ;;
+    esac
+}
+
+cmd_install() {
+    echo "→ Instalando LaunchAgents..."
+    launchctl bootstrap "gui/$UID_N" "$PLIST_APP" 2>/dev/null || echo "  · app já instalado"
+    launchctl bootstrap "gui/$UID_N" "$PLIST_TUNNEL" 2>/dev/null || echo "  · tunnel já instalado"
+    echo "  ✓ RoPA iniciará automaticamente no próximo login"
+}
+
+cmd_uninstall() {
+    echo "→ Removendo LaunchAgents..."
+    launchctl bootout "gui/$UID_N/$LABEL_TUNNEL" 2>/dev/null || true
+    launchctl bootout "gui/$UID_N/$LABEL_APP" 2>/dev/null || true
+    echo "  ✓ Serviços parados (plist files mantidos)"
+}
+
+case "${1:-status}" in
+    start)     cmd_start ;;
+    stop)      cmd_stop ;;
+    restart)   cmd_restart ;;
+    status)    cmd_status ;;
+    url)       cmd_url ;;
+    logs)      cmd_logs "$2" ;;
+    install)   cmd_install ;;
+    uninstall) cmd_uninstall ;;
+    *)
+        cat <<EOF
+ropa-ctl — Gerenciador do RoPA em produção
+
+Uso:  ropa-ctl <comando>
+
+Comandos:
+  start         Inicia gunicorn + cloudflare tunnel
+  stop          Para ambos os serviços
+  restart       Reinicia ambos
+  status        Mostra estado dos serviços e URL pública
+  url           Imprime apenas a URL pública
+  logs [alvo]   Tail dos logs (alvo: app, tunnel, ou all)
+  install       Registra LaunchAgents (autostart no login)
+  uninstall     Remove LaunchAgents
+EOF
+        exit 1
+        ;;
+esac

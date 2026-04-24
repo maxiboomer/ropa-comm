@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} · RoPA{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  <div class="row g-3">
+    <div class="col-lg-8">
+
+      <!-- Identificação -->
+      <div class="form-card">
+        <h6><i class="bi bi-tag me-1"></i> Identificação</h6>
+        <div class="mb-3">
+          <label class="form-label">Nome da Atividade <span class="req">*</span></label>
+          <input type="text" name="nome_atividade" class="form-control form-control-sm"
+                 value="{{ atividade.nome_atividade if atividade else '' }}"
+                 placeholder="Ex: Cadastro de Mesários Voluntários" required>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-7">
+            <label class="form-label">Unidade Controladora</label>
+            <input type="text" name="unidade_controladora" class="form-control form-control-sm"
+                   value="{{ atividade.unidade_controladora if atividade else '' }}"
+                   placeholder="Ex: Unidade de TI">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Processo SEI</label>
+            <input type="text" name="sistema_sei" class="form-control form-control-sm"
+                   value="{{ atividade.sistema_sei if atividade else '' }}"
+                   placeholder="Ex: SEI 0006491-21.2026...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Tratamento -->
+      <div class="form-card">
+        <h6><i class="bi bi-gear me-1"></i> Tratamento</h6>
+        <div class="mb-3">
+          <label class="form-label">Finalidade <span class="req">*</span></label>
+          <textarea name="finalidade" class="form-control form-control-sm" rows="2"
+                    placeholder="Descreva o propósito do tratamento de dados..." required>{{ atividade.finalidade if atividade else '' }}</textarea>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Base Legal <span class="req">*</span></label>
+          <select name="base_legal" class="form-select form-select-sm" required>
+            <option value="">— selecione —</option>
+            {% for codigo, descricao in BASES_LEGAIS.items() %}
+            <option value="{{ codigo }}"
+              {% if atividade and atividade.base_legal == codigo %}selected{% endif %}>
+              {{ codigo }} – {{ descricao }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Dados -->
+      <div class="form-card">
+        <h6><i class="bi bi-person-vcard me-1"></i> Dados Pessoais</h6>
+        <div class="mb-3">
+          <label class="form-label">Categorias de Titulares</label>
+          <input type="text" name="categorias_titulares" class="form-control form-control-sm"
+                 value="{{ atividade.categorias_titulares if atividade else '' }}"
+                 placeholder="Ex: servidores, mesários, candidatos, visitantes">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Categorias de Dados</label>
+          <textarea name="categorias_dados" class="form-control form-control-sm" rows="2"
+                    placeholder="Ex: nome, CPF, e-mail, endereço, dados bancários...">{{ atividade.categorias_dados if atividade else '' }}</textarea>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="dados_sensiveis"
+                 id="dados_sensiveis" value="1"
+                 {% if atividade and atividade.dados_sensiveis %}checked{% endif %}>
+          <label class="form-check-label" for="dados_sensiveis" style="font-size:0.82rem;">
+            Envolve <strong>dados sensíveis</strong> (Art. 5º, II LGPD)
+            <span style="font-size:0.72rem;color:#888;"> — biometria, saúde, origem racial, religião, etc.</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Compartilhamento -->
+      <div class="form-card">
+        <h6><i class="bi bi-share me-1"></i> Compartilhamento</h6>
+        <div class="mb-3">
+          <label class="form-label">Destinatários</label>
+          <textarea name="destinatarios" class="form-control form-control-sm" rows="2"
+                    placeholder="Órgãos, sistemas ou terceiros com quem os dados são compartilhados...">{{ atividade.destinatarios if atividade else '' }}</textarea>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Transferência Internacional</label>
+          <input type="text" name="transferencia_inter" class="form-control form-control-sm"
+                 value="{{ atividade.transferencia_inter if atividade else 'N/A' }}"
+                 placeholder="N/A ou descreva o país/organização destinatária">
+        </div>
+      </div>
+
+      <!-- Retenção e Segurança -->
+      <div class="form-card">
+        <h6><i class="bi bi-lock me-1"></i> Retenção e Segurança</h6>
+        <div class="mb-3">
+          <label class="form-label">Prazo de Retenção</label>
+          <input type="text" name="prazo_retencao" class="form-control form-control-sm"
+                 value="{{ atividade.prazo_retencao if atividade else '' }}"
+                 placeholder="Ex: 5 anos conforme Res. TSE 23.222/2010">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Medidas de Segurança <small>(Art. 46 LGPD)</small></label>
+          <textarea name="medidas_seguranca" class="form-control form-control-sm" rows="2"
+                    placeholder="Controle de acesso, criptografia, logs de auditoria...">{{ atividade.medidas_seguranca if atividade else '' }}</textarea>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Observações</label>
+          <textarea name="observacoes" class="form-control form-control-sm" rows="2"
+                    placeholder="Informações adicionais relevantes...">{{ atividade.observacoes if atividade else '' }}</textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+      <div class="form-card sticky-top" style="top:72px;">
+        <h6><i class="bi bi-info-circle me-1"></i> Referências LGPD</h6>
+        <ul style="font-size:0.75rem;color:#666;padding-left:1rem;margin:0;">
+          <li class="mb-1"><strong>Art. 37</strong> — Registro obrigatório de atividades de tratamento</li>
+          <li class="mb-1"><strong>Art. 46</strong> — Medidas técnicas e administrativas de segurança</li>
+          <li class="mb-1"><strong>Art. 7º</strong> — Bases legais para dados pessoais gerais</li>
+          <li class="mb-1"><strong>Art. 11</strong> — Bases legais para dados sensíveis</li>
+          <li><strong>Art. 5º, II</strong> — Definição de dados sensíveis</li>
+        </ul>
+
+        <hr style="border-color:#eee;">
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:1rem;">
+          Campos marcados com <span style="color:#dc3545;">*</span> são obrigatórios para completude mínima.
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-tre">
+            <i class="bi bi-check-lg me-1"></i>
+            {% if atividade %}Salvar Alterações{% else %}Criar Atividade{% endif %}
+          </button>
+          <a href="{{ url_for('listar') }}" class="btn btn-outline-secondary btn-sm">
+            Cancelar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

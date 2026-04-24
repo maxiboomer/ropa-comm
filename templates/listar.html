@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Atividades · RoPA{% endblock %}
+{% block page_title %}Atividades de Tratamento{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span style="font-size:0.85rem;color:#666;">
+    {{ registros|length }} atividade(s) registrada(s)
+  </span>
+  <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm">
+    <i class="bi bi-plus"></i> Nova Atividade
+  </a>
+</div>
+
+<div class="bg-white border rounded" style="border-color:var(--tre-borda) !important;">
+  {% if registros %}
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:48px">#</th>
+          <th>Atividade</th>
+          <th>Unidade</th>
+          <th>Base Legal</th>
+          <th style="width:90px">Sensível</th>
+          <th style="width:160px">Completude</th>
+          <th style="width:110px">Atualizado</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registros %}
+        {% set score, _ = pontuacao(r) %}
+        <tr>
+          <td class="text-muted">{{ r.id }}</td>
+          <td>
+            <a href="{{ url_for('ver', atividade_id=r.id) }}"
+               style="color:var(--tre-azul);font-weight:600;text-decoration:none;">
+              {{ r.nome_atividade }}
+            </a>
+          </td>
+          <td style="font-size:0.78rem;color:#888;">{{ r.unidade_controladora or '—' }}</td>
+          <td>
+            {% if r.base_legal %}
+              <span title="{{ BASES_LEGAIS.get(r.base_legal, '') }}"
+                    class="badge text-bg-light text-dark" style="cursor:help;">
+                {{ r.base_legal }}
+              </span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.dados_sensiveis %}
+              <span class="badge-sensivel">Sim</span>
+            {% else %}
+              <span class="text-muted" style="font-size:0.8rem;">Não</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="score-block">
+              <div class="progress" style="flex:1;height:5px;">
+                <div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div>
+              </div>
+              <span style="font-size:0.75rem;font-weight:600;
+                color:{{ '#198754' if score >= 80 else ('#fd7e14' if score >= 50 else '#dc3545') }}">
+                {{ score }}%
+              </span>
+            </div>
+          </td>
+          <td style="font-size:0.75rem;color:#aaa;">{{ (r.atualizado_em or '')[:10] }}</td>
+          <td>
+            <a href="{{ url_for('ver', atividade_id=r.id) }}"
+               class="btn btn-sm btn-outline-secondary py-0 px-2 me-1">Ver</a>
+            <a href="{{ url_for('editar', atividade_id=r.id) }}"
+               class="btn btn-sm btn-outline-primary py-0 px-2">Editar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-journal-x" style="font-size:2rem;"></i>
+    <p class="mt-2 mb-1">Nenhuma atividade cadastrada.</p>
+    <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm mt-2">
+      <i class="bi bi-plus"></i> Criar primeira atividade
+    </a>
+    <form action="{{ url_for('seed') }}" method="post" class="mt-2">
+      <button class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-database-add"></i> Carregar exemplos
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

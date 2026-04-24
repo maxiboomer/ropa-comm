@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.db
+exports/
+.venv/
+.env
+*.log
+Roadmap_Implantacao_RoPA*.docx
+.claude/settings.local.json

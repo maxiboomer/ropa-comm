@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · RoPA{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card d-flex align-items-center gap-3">
+      <i class="bi bi-journal-text text-primary"></i>
+      <div>
+        <div class="stat-value">{{ registros|length }}</div>
+        <div class="stat-label">Atividades</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card d-flex align-items-center gap-3">
+      <i class="bi bi-patch-check text-success"></i>
+      <div>
+        <div class="stat-value">{{ completos }}</div>
+        <div class="stat-label">Completas ≥ 80%</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card d-flex align-items-center gap-3">
+      <i class="bi bi-shield-exclamation text-danger"></i>
+      <div>
+        <div class="stat-value">{{ sensiveis }}</div>
+        <div class="stat-label">Dados Sensíveis</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card d-flex align-items-center gap-3">
+      <i class="bi bi-bar-chart text-warning"></i>
+      <div>
+        <div class="stat-value">{{ "%.0f"|format(media) }}%</div>
+        <div class="stat-label">Completude Média</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Barra média geral -->
+{% if registros %}
+<div class="bg-white border rounded p-3 mb-4" style="border-color: var(--tre-borda) !important;">
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <span style="font-size:0.8rem;font-weight:600;color:#555;">Completude geral do RoPA</span>
+    <span style="font-size:0.8rem;font-weight:700;color:var(--tre-azul);">{{ "%.1f"|format(media) }}%</span>
+  </div>
+  <div class="progress" style="height:10px;">
+    <div class="progress-bar bg-{{ 'success' if media >= 80 else ('warning' if media >= 50 else 'danger') }}"
+         style="width:{{ media }}%"></div>
+  </div>
+  <div class="mt-2" style="font-size:0.75rem;color:#888;">
+    {{ completos }} de {{ registros|length }} atividade(s) com completude ≥ 80% · conforme LGPD Art. 37
+  </div>
+</div>
+{% endif %}
+
+<!-- Tabela resumo -->
+<div class="bg-white border rounded" style="border-color: var(--tre-borda) !important;">
+  <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+    <span style="font-size:0.8rem;font-weight:700;color:var(--tre-azul);">
+      <i class="bi bi-list-ul me-1"></i> Atividades de Tratamento
+    </span>
+    {% if not registros %}
+    <form action="{{ url_for('seed') }}" method="post">
+      <button class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-database-add"></i> Carregar exemplos
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if registros %}
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:48px">#</th>
+          <th>Atividade</th>
+          <th>Base Legal</th>
+          <th style="width:90px">Sensível</th>
+          <th style="width:160px">Completude</th>
+          <th style="width:110px">Atualizado</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registros %}
+        {% set score, _ = pontuacao(r) %}
+        <tr>
+          <td class="text-muted">{{ r.id }}</td>
+          <td>
+            <a href="{{ url_for('ver', atividade_id=r.id) }}"
+               style="color:var(--tre-azul);font-weight:600;text-decoration:none;">
+              {{ r.nome_atividade }}
+            </a>
+            {% if r.unidade_controladora %}
+              <div style="font-size:0.72rem;color:#aaa;">{{ r.unidade_controladora }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.base_legal %}
+              <span class="badge text-bg-light text-dark">{{ r.base_legal }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.dados_sensiveis %}
+              <span class="badge-sensivel">Sim</span>
+            {% else %}
+              <span class="text-muted" style="font-size:0.8rem;">Não</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="score-block">
+              <div class="progress" style="flex:1;height:5px;">
+                <div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div>
+              </div>
+              <span style="font-size:0.75rem;font-weight:600;color:{{ '#198754' if score >= 80 else ('#ffc107' if score >= 50 else '#dc3545') }}">
+                {{ score }}%
+              </span>
+            </div>
+          </td>
+          <td style="font-size:0.75rem;color:#aaa;">
+            {{ (r.atualizado_em or '')[:10] }}
+          </td>
+          <td>
+            <a href="{{ url_for('ver', atividade_id=r.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2">
+              Ver
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-journal-x" style="font-size:2rem;"></i>
+    <p class="mt-2 mb-0">Nenhuma atividade registrada.</p>
+    <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm mt-3">
+      <i class="bi bi-plus"></i> Criar primeira atividade
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

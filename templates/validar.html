@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Validar Completude · RoPA{% endblock %}
+{% block page_title %}Validação de Completude — LGPD Art. 37{% endblock %}
+
+{% block content %}
+{% if resultados %}
+<!-- Resumo geral -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-value">{{ "%.1f"|format(media) }}%</div>
+      <div class="stat-label">Completude Média</div>
+      <div class="progress mt-2" style="height:8px;">
+        <div class="progress-bar bg-{{ 'success' if media >= 80 else ('warning' if media >= 50 else 'danger') }}"
+             style="width:{{ media }}%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-value text-success">{{ resultados|selectattr('score', 'ge', 80)|list|length }}</div>
+      <div class="stat-label">Completas ≥ 80%</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card text-center">
+      <div class="stat-value text-danger">{{ resultados|selectattr('score', 'lt', 80)|list|length }}</div>
+      <div class="stat-label">Requerem Atenção</div>
+    </div>
+  </div>
+</div>
+
+<!-- Lista detalhada -->
+<div class="bg-white border rounded" style="border-color:var(--tre-borda)!important;">
+  <div class="px-3 py-2 border-bottom" style="font-size:0.8rem;font-weight:700;color:var(--tre-azul);">
+    <i class="bi bi-patch-check me-1"></i> Resultado por Atividade
+  </div>
+  {% for item in resultados %}
+  {% set r = item.atividade %}
+  {% set score = item.score %}
+  {% set faltando = item.faltando %}
+  <div class="px-3 py-3 border-bottom {% if not loop.last %}{% endif %}">
+    <div class="d-flex align-items-start gap-3">
+      <!-- Score circle -->
+      <div class="flex-shrink-0 text-center" style="width:52px;">
+        <div style="font-size:1.1rem;font-weight:700;
+          color:{{ '#198754' if score >= 80 else ('#fd7e14' if score >= 50 else '#dc3545') }}">
+          {{ score }}%
+        </div>
+        <div class="progress mt-1" style="height:4px;">
+          <div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <a href="{{ url_for('ver', atividade_id=r.id) }}"
+             style="font-weight:600;color:var(--tre-azul);text-decoration:none;font-size:0.88rem;">
+            #{{ r.id }} {{ r.nome_atividade }}
+          </a>
+          {% if r.dados_sensiveis %}
+            <span class="badge-sensivel">Sensível</span>
+          {% endif %}
+          {% if score >= 80 %}
+            <span class="badge text-bg-success" style="font-size:0.68rem;">Completo</span>
+          {% elif score >= 50 %}
+            <span class="badge text-bg-warning text-dark" style="font-size:0.68rem;">Parcial</span>
+          {% else %}
+            <span class="badge text-bg-danger" style="font-size:0.68rem;">Incompleto</span>
+          {% endif %}
+        </div>
+
+        {% if faltando %}
+        <div style="font-size:0.75rem;color:#888;">
+          Campos ausentes:
+          {% for desc, peso in faltando %}
+            <span class="badge text-bg-light text-secondary border me-1">{{ desc }} <span class="text-muted">{{ peso }}%</span></span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="font-size:0.75rem;color:#198754;">
+          <i class="bi bi-check-circle-fill"></i> Todos os campos obrigatórios preenchidos
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div class="flex-shrink-0">
+        <a href="{{ url_for('editar', atividade_id=r.id) }}"
+           class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75rem;">
+          <i class="bi bi-pencil"></i> Editar
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-journal-x" style="font-size:2rem;"></i>
+  <p class="mt-2">Nenhuma atividade registrada.</p>
+  <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm">
+    <i class="bi bi-plus"></i> Criar Atividade
+  </a>
+</div>
+{% endif %}
+{% endblock %}

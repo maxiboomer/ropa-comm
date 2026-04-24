@@ -1,0 +1,146 @@
+{
+  "atividades": [
+    {
+      "traitement": {
+        "nom": "Gestão de Documentos Processuais Eletrônicos",
+        "finalites": [
+          "Armazenamento e gerenciamento de processos eletrônicos",
+          "Cumprimento de obrigações legais de retenção"
+        ]
+      },
+      "fondement_legal": {
+        "type": "obrigacao_legal"
+      },
+      "personnes": {
+        "categories": [
+          "Usuários do sistema SEI",
+          "Partes processuais",
+          "Servidores públicos"
+        ]
+      },
+      "donnees": {
+        "type": [
+          "Dados de identificação",
+          "Documentos processuais",
+          "Histórico de auditoria"
+        ],
+        "sensibles": false
+      },
+      "destinataires": [
+        "Departamento de Tecnologia",
+        "Gabinete da Presidência",
+        "Órgãos de controle externo (TCU)"
+      ],
+      "transferts_intl": {
+        "pays": []
+      },
+      "duree_conservation": "20 anos conforme Lei de Arquivos",
+      "mesures_securite": [
+        "Criptografia em repouso",
+        "Acesso baseado em papéis (RBAC)",
+        "Logs de auditoria contínuos",
+        "Backup redundante diário"
+      ],
+      "responsable": {
+        "nom": "Unidade de TI"
+      },
+      "description": "Sistema SEI integrado com backup centralizado. Documentos são criptografados e armazenados em múltiplos datacenters."
+    },
+    {
+      "traitement": {
+        "nom": "Registro de Eleitores Potenciais para Pré-cadastro",
+        "finalites": [
+          "Identificação de cidadãos elegíveis para cadastro de eleitor",
+          "Geração de lista de pré-cadastro para polícia eleitoral"
+        ]
+      },
+      "fondement_legal": {
+        "type": "executar_politicas_publicas"
+      },
+      "personnes": {
+        "categories": [
+          "Cidadãos com documentação incompleta",
+          "Nacionais brasileiros",
+          "Estrangeiros naturalizados"
+        ]
+      },
+      "donnees": {
+        "type": [
+          "Nome completo",
+          "Data de nascimento",
+          "Número do CPF",
+          "Endereço residencial",
+          "E-mail e telefone de contato"
+        ],
+        "sensibles": false
+      },
+      "destinataires": [
+        "Polícia Federal (validação de identidade)",
+        "Sistemas eleitorais estaduais",
+        "Cartórios eleitorais"
+      ],
+      "transferts_intl": {
+        "pays": []
+      },
+      "duree_conservation": "3 anos após conclusão do cadastro ou negativa",
+      "mesures_securite": [
+        "Segregação de dados por estado",
+        "Mascaramento de CPF em listagens",
+        "Acesso limitado a usuários nomeados",
+        "Validação de integridade de dados"
+      ],
+      "responsable": {
+        "nom": "SECJUD - Secretaria Judiciária e de Gestão da Informação"
+      },
+      "description": "Integração com base nacional de eleitores. Processo de pré-cadastro automatizado com validação contra registros do Poder Executivo."
+    },
+    {
+      "traitement": {
+        "nom": "Monitoramento de Infraestrutura Física (CFTV)",
+        "finalites": [
+          "Segurança patrimonial das dependências",
+          "Investigação de incidentes de segurança",
+          "Controle de acesso às áreas restritas"
+        ]
+      },
+      "fondement_legal": {
+        "type": "legitimo_interesse"
+      },
+      "personnes": {
+        "categories": [
+          "Servidores públicos",
+          "Visitantes",
+          "Prestadores de serviço terceirizados"
+        ]
+      },
+      "donnees": {
+        "type": [
+          "Imagens de vídeo",
+          "Identificação facial incidental",
+          "Metadados de acesso (entrada/saída)"
+        ],
+        "sensibles": true
+      },
+      "destinataires": [
+        "Centro de Segurança Institucional",
+        "Polícia Federal (em caso de crime)",
+        "Departamento de Recursos Humanos (verificação disciplinar)"
+      ],
+      "transferts_intl": {
+        "pays": []
+      },
+      "duree_conservation": "30 dias em sobrescrita contínua; incidentes: até encerramento de apuração",
+      "mesures_securite": [
+        "Sala de monitoramento com acesso físico restrito",
+        "DVR com criptografia de vídeos armazenados",
+        "Sem acesso remoto externo",
+        "Limpeza automática de gravações",
+        "Notificação visual de monitoramento"
+      ],
+      "responsable": {
+        "nom": "ASSEG - Seção de Infraestrutura e Segurança"
+      },
+      "description": "Sistema CFTV composto por 47 câmeras distribuídas nas dependências. Biometria facial é incidental à captura de vídeo. Dado sensível conforme Art. 5º, II LGPD."
+    }
+  ]
+}
