@@ -1,317 +1,190 @@
-# RoPA 
-## Registro de Atividades de Tratamento de Dados
+# RoPA — Registro de Operações de Tratamento (PPSI 2.0)
 
-Aplicação web para gerenciamento de **Registros de Atividades de Tratamento (RoPA)** institucional, em conformidade com a **Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)**
+Aplicação web para gestão do **Registro de Operações de Tratamento de Dados Pessoais (ROPA)**,
+alinhada ao **Programa de Privacidade e Segurança da Informação (PPSI 2.0)** — controle 19 do
+framework da Portaria SGD/MGI nº 9.511/2025 — e à **LGPD (Lei 13.709/2018, art. 37)**.
 
----
-
-## 📋 Visão Geral
-
-O RoPA é uma solução completa para documentação e rastreamento de atividades de processamento de dados pessoais, incluindo:
-
-✅ Registro de atividades de tratamento (Art. 37 LGPD)
-✅ Validação de completude conforme LGPD
-✅ Autenticação institucional via Keycloak (OIDC)
-✅ Gestão de dados sensíveis e direitos de titulares
-✅ Exportação em múltiplos formatos (XLSX, PDF, JSON, CSV)
-✅ Interface web responsiva com Bootstrap 5
-✅ CLI para automação e seed de dados
-✅ Mock Keycloak para prototipagem
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask)
+![PPSI 2.0](https://img.shields.io/badge/PPSI%202.0-alinhado-1F3D7A)
+![LGPD](https://img.shields.io/badge/LGPD-Art.%2037-green)
+![License](https://img.shields.io/badge/Licen%C3%A7a-MIT-blue)
 
 ---
 
-## 🚀 Quick Start
+## 📋 Visão geral
 
-### 1. Clonar o repositório
-```bash
-git clone <seu-repositorio>
-cd ropa
-```
+O RoPA é uma solução completa para documentar e rastrear as operações de tratamento de dados
+pessoais de um órgão ou entidade da administração pública federal (SISP), em conformidade com:
 
-### 2. Configurar ambiente Python
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# ou: .venv\Scripts\activate  # Windows
-```
+- **Controle 19 do PPSI 2.0** — registro das operações de tratamento de dados pessoais;
+- **Art. 37 da LGPD** — obrigação de manter o registro das operações de tratamento;
+- **Guia para Elaboração do Registro das Operações de Tratamento (PPSI 2.0, v1.0)** — conteúdo
+  mínimo dos blocos 4.1 a 4.6, adotado como modelo de dados do sistema.
 
-### 3. Instalar dependências
+### Funcionalidades
+
+- ✅ Registro completo das operações de tratamento, cobrindo o **conteúdo mínimo do Guia PPSI 2.0**;
+- ✅ **Versionamento semântico** de cada registro, com snapshot e **restauração** de versões anteriores;
+- ✅ Situação do registro (em andamento / em revisão / concluído / descontinuado / cancelado);
+- ✅ Taxonomia de tipos de dados **compatível com o FCI da ANPD**;
+- ✅ Validação de completude ponderada (soma 100) e dashboard;
+- ✅ Autenticação institucional via **Keycloak (OIDC)**, com mock para desenvolvimento;
+- ✅ Exportação em múltiplos formatos (**JSON, CSV, XLSX, PDF**);
+- ✅ Interface web responsiva (Bootstrap 5);
+- ✅ CLI para automação e seed de dados;
+- ✅ Importador de **PIA CNIL** (JSON).
+
+---
+
+## 🗂️ Conteúdo do registro (Guia PPSI 2.0)
+
+O modelo de dados segue o conteúdo mínimo da Tabela 1 do Guia do ROPA:
+
+| Bloco | Informações |
+|-------|-------------|
+| **4.1 Identificação** | identificador único, nome do produto/serviço, unidade responsável, responsável pelo preenchimento, situação, versão/histórico |
+| **4.2 Dados pessoais tratados** | categorias de titulares (com estimativa), proteção reforçada, tipos de dados (por categoria FCI-ANPD), tipos sensíveis |
+| **4.3 Ciclo de vida dos dados** | fluxo de tratamento, origem, local/meio de armazenamento, retenção, eliminação/destinação final, frequência |
+| **4.4 Finalidade e fundamentação** | finalidade, hipótese legal (base legal), previsão normativa específica |
+| **4.5 Agentes de tratamento** | controladores, operadores |
+| **4.6 Compartilhamento e transferência** | compartilhamentos, transferência internacional |
+
+### Versionamento
+
+Cada edição relevante gera uma nova versão (ex.: v1.0 → v1.1 → v2.0), com **snapshot completo**,
+data, responsável e síntese das alterações. Alterações estruturais (finalidade, base legal, tipos de
+dados, agentes etc.) promovem **versão major**. A **restauração** de uma versão anterior gera uma nova
+versão documentando a reversão (o histórico nunca é apagado).
+
+---
+
+## 🚀 Início rápido (desenvolvimento)
+
 ```bash
+# 1. Ambiente
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-### 4. Rodar em desenvolvimento (com mock Keycloak)
-```bash
+# 2. Rodar com mock Keycloak
 ./start_dev.sh
 # ou: KEYCLOAK_MOCK=1 python app.py
 ```
 
-Acesse: **http://localhost:5000**
+Acesse **http://localhost:5000**
 
-### Usuários de teste (senha: 123)
-- **encarregado** - Encarregado de Proteção de Dados (DPO, Admin)
-- **admin** - Administrador TI (Admin)
-- **usuario** - Maria Silva (Viewer)
-
----
-
-## 📦 Instalação em Produção
-
-### macOS — Instalação permanente com autostart (Recomendado para uso local)
-
-Instala RoPA como serviço permanente com:
-- **gunicorn** (WSGI production server, 4 workers)
-- **Cloudflare Tunnel** (URL pública HTTPS `.trycloudflare.com`)
-- **launchd LaunchAgents** (autostart no login, KeepAlive em crash)
-- **ropa-ctl** (ferramenta de gerenciamento)
-
-```bash
-git clone https://github.com/maxiboomer/ropa.git
-cd ropa
-./deploy/install-macos.sh
-./ropa-ctl start
-./ropa-ctl status   # mostra URL pública
-```
-
-Gerenciamento:
-```bash
-./ropa-ctl status       # estado + URL pública
-./ropa-ctl restart      # reinicia ambos serviços
-./ropa-ctl logs tunnel  # tail dos logs
-./ropa-ctl url          # só imprime a URL
-./ropa-ctl stop         # para serviços
-./ropa-ctl uninstall    # remove LaunchAgents
-```
-
-Dados persistidos em `~/Library/Application Support/ropa/`:
-- `ropa.db` — banco SQLite
-- `.env` — credenciais + FLASK_SECRET_KEY
-- `logs/` — stdout/stderr de gunicorn e cloudflared
-
-### Docker
-```bash
-docker build -t ropa .
-docker run -p 8000:5000 \
-  -e KEYCLOAK_URL=https://seu-keycloak.com \
-  -e KEYCLOAK_REALM=ropa \
-  -e KEYCLOAK_CLIENT_ID=ropa-web \
-  -e KEYCLOAK_CLIENT_SECRET=seu-secret \
-  -e FLASK_SECRET_KEY=seu-secret-key \
-  ropa
-```
-
-### Heroku / PaaS
-```bash
-git push heroku main
-```
-
-O arquivo `Procfile` já está configurado:
-```
-web: gunicorn app:app --bind 0.0.0.0:$PORT
-```
-
-### Instalação Manual
-
-#### Requisitos
-- Python 3.9+
-- Keycloak 18+ (ou mock para desenvolvimento)
-- SQLite 3
-
-#### Passos
-```bash
-# 1. Clonar e preparar
-git clone <seu-repositorio>
-cd ropa
-python3 -m venv venv
-source venv/bin/activate
-
-# 2. Instalar
-pip install -r requirements.txt
-
-# 3. Configurar variáveis de ambiente
-cp .env.example .env
-# Editar .env com suas credenciais Keycloak
-
-# 4. Inicializar banco de dados
-python app.py  # Cria ropa.db automaticamente
-
-# 5. Rodar
-gunicorn app:app --bind 0.0.0.0:5000
-```
+### Usuários de teste (senha: `123`)
+- **encarregado** — Encarregado de Proteção de Dados (DPO, admin)
+- **admin** — Administrador TI (admin)
+- **usuario** — Maria Silva (visualização)
 
 ---
 
-## 🔐 Variáveis de Ambiente
+## 🏭 Implantação em produção (Linux / systemd)
 
-```bash
-# Flask
-FLASK_SECRET_KEY=sua-chave-secreta-aqui
+O serviço roda com **gunicorn** atrás de um proxy reverso (Caddy) e Keycloak mock:
 
-# Keycloak OIDC
-KEYCLOAK_URL=http://keycloak.example.com
-KEYCLOAK_REALM=ropa
-KEYCLOAK_CLIENT_ID=ropa-web
-KEYCLOAK_CLIENT_SECRET=seu-client-secret
+```ini
+# /etc/systemd/system/ropa.service
+[Unit]
+Description=RoPA - Registro de Atividades de Tratamento (LGPD)
+After=network.target
 
-# Desenvolvimento (ativar mock Keycloak)
-KEYCLOAK_MOCK=1  # ou "true", "yes"
+[Service]
+Type=simple
+WorkingDirectory=/opt/ropa-comm
+Environment=KEYCLOAK_MOCK=1
+Environment=ROPA_BASE_URL=https://seu-dominio
+Environment=ROPA_MOCK_INTERNAL_URL=http://127.0.0.1:5000
+Environment=FLASK_SECRET_KEY=troque-por-um-segredo-gerado
+ExecStart=/opt/ropa-comm/.venv/bin/gunicorn app:app --bind 127.0.0.1:5000 --workers 2 --chdir /opt/ropa-comm
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Veja `.env.example` para template completo.
+```bash
+systemctl daemon-reload && systemctl enable --now ropa
+systemctl status ropa
+```
+
+> **Importante:** gere um `FLASK_SECRET_KEY` forte para produção
+> (`python -c "import secrets; print(secrets.token_hex(32))"`). Nunca use o valor de exemplo.
 
 ---
 
 ## 🛠️ Uso da CLI
 
 ```bash
-# Novo registro
-python ropa.py novo
-
-# Listar atividades
-python ropa.py listar
-
-# Ver detalhes
-python ropa.py ver <id>
-
-# Editar
-python ropa.py editar <id>
-
-# Validar completude
-python ropa.py validar
-
-# Popular com dados de exemplo
-python ropa.py seed
-
-# Exportar
-python ropa.py exportar [json|csv|xlsx]
-
-# Gerar relatório PDF
-python ropa.py relatorio
+python ropa.py novo          # Criar nova atividade de tratamento
+python ropa.py listar        # Listar atividades
+python ropa.py ver <id>      # Ver detalhes
+python ropa.py editar <id>   # Editar (gera nova versão)
+python ropa.py validar       # Validar completude (PPSI 2.0)
+python ropa.py exportar      # Exportar JSON + CSV + XLSX
+python ropa.py relatorio     # Relatório institucional PDF
+python ropa.py seed          # Popular com dados de exemplo
+python ropa.py importar pia.json [--strategy skip|merge|overwrite]  # Importar PIA CNIL
 ```
 
 ---
 
-## 📊 Estrutura de Dados
-
-### Atividades de Tratamento
-Cada registro inclui:
-- Nome da atividade
-- Finalidade do tratamento
-- Base legal (Art. 7 LGPD)
-- Categorias de titulares
-- Tipos de dados processados
-- Dados sensíveis? (Sim/Não)
-- Destinatários
-- Transferência internacional
-- Prazo de retenção
-- Medidas de segurança
-- Unidade controladora
-- Sistema SEI
-- Observações
-
-### Validação (Art. 37 LGPD)
-Campos obrigatórios para completude mínima (80%):
-- Nome da atividade
-- Base legal
-- Categorias de titulares
-- Medidas de segurança
-- Unidade controladora
-
----
-
-## 🔑 Autenticação
-
-### Com Keycloak Real
-1. Configurar `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
-2. Criar realm `ropa` e cliente `ropa-web` no Keycloak
-3. Remover variável `KEYCLOAK_MOCK` ou defini-la como `0`/`false`
-
-### Mock Keycloak (Desenvolvimento)
-- Ativar `KEYCLOAK_MOCK=1`
-- Roda como Blueprint Flask na mesma porta 5000
-- URL: `http://localhost:5000/mock-kc`
-- Usuários hardcoded (veja `keycloak_blueprint.py`)
-
----
-
-## 📁 Estrutura do Projeto
-
-```
-ropa/
-├── app.py                      # Aplicação Flask principal
-├── ropa.py                     # CLI (linha de comando)
-├── keycloak_blueprint.py       # Mock Keycloak (Blueprint)
-├── keycloak_mock.py            # Mock Keycloak standalone (não usado)
-├── gerar_roadmap.py            # Gera documento DOCX roadmap
-├── requirements.txt            # Dependências Python
-├── Dockerfile                  # Container Docker
-├── Procfile                    # Heroku deployment
-├── .env.example                # Template de variáveis de ambiente
-├── start_dev.sh                # Script inicialização dev
-├── setup_ropa.sh               # Setup script
-│
-├── templates/                  # Templates Jinja2
-│   ├── base.html               # Base layout
-│   ├── login.html              # Tela de login
-│   ├── index.html              # Dashboard
-│   ├── listar.html             # Tabela de atividades
-│   ├── ver.html                # Detalhes + histórico
-│   ├── form.html               # Criar/editar
-│   └── validar.html            # Validação de completude
-│
-└── .claude/
-    ├── launch.json             # Config Claude Code preview
-    └── settings.local.json     # Configurações locais
-```
-
----
-
-## 🧪 Testes
-
-Ativar mock Keycloak para testes sem infraestrutura real:
+## 🔐 Variáveis de ambiente
 
 ```bash
-KEYCLOAK_MOCK=1 python app.py
+# Flask
+FLASK_SECRET_KEY=sua-chave-secreta
+
+# Keycloak OIDC
+KEYCLOAK_URL=https://keycloak.example.com
+KEYCLOAK_REALM=ropa
+KEYCLOAK_CLIENT_ID=ropa-web
+KEYCLOAK_CLIENT_SECRET=seu-client-secret
+
+# Desenvolvimento (mock Keycloak)
+KEYCLOAK_MOCK=1
+
+# Identidade institucional (opcional)
+ROPA_ORGANIZACAO=Organização
+ROPA_UNIDADE=Unidade de Proteção de Dados
+ROPA_ENCARREGADO=Encarregado(a) de Proteção de Dados
+ROPA_NORMAS_REFERENCIA=Documento produzido nos termos da LGPD – Lei 13.709/2018, Art. 37
 ```
 
-Login na tela:
-1. Clique em "Entrar com Keycloak"
-2. Digite: `encarregado` / `123`
-3. Dashboard carrega automaticamente
+Veja `.env.example` para o template completo.
 
 ---
 
-## 📋 Roadmap Técnico
+## 📁 Estrutura do projeto
 
-Veja `Roadmap_Implantacao_RoPA.docx` para implementação em infraestrutura institucional:
-- Arquitetura
-- Cronograma
-- Requisitos de produção
-- Plano de continuidade
+```
+ropa-comm/
+├── app.py                  # Aplicação Flask (web)
+├── ropa.py                 # CLI
+├── modelo_ppsi.py          # Campos/taxonomia PPSI 2.0 (FCI-ANPD), migração, versionamento
+├── keycloak_blueprint.py   # Mock Keycloak (Blueprint)
+├── cnil_pia_importer.py    # Importador PIA CNIL
+├── requirements.txt
+├── .env.example
+├── templates/              # Jinja2 (form, ver, listar, index, validar, importar)
+└── static/                 # Bootstrap (vendor), assets
+```
 
 ---
 
 ## 🔗 Referências
 
-- **LGPD**: Lei 13.709/2018 - Lei Geral de Proteção de Dados
-- **Art. 37 LGPD**: Obrigação de manter Registro de Atividades de Tratamento
-
-- **Keycloak**: https://www.keycloak.org
-- **Flask**: https://flask.palletsprojects.com
-- **Bootstrap 5**: https://getbootstrap.com
+- **PPSI 2.0** — Programa de Privacidade e Segurança da Informação (Portaria SGD/MGI nº 9.511/2025):
+  https://www.gov.br/governodigital/pt-br/privacidade-e-seguranca/ppsi-2.0
+- **Guia para Elaboração do Registro das Operações de Tratamento (PPSI 2.0, v1.0)**
+- **LGPD** — Lei 13.709/2018, especialmente o **art. 37** (registro das operações de tratamento)
 
 ---
 
-## 👥 Contribuição
+## 📄 Licença
 
-Para contribuir:
-1. Criar branch: `git checkout -b feature/sua-feature`
-2. Commit: `git commit -am "Add: sua feature"`
-3. Push: `git push origin feature/sua-feature`
-4. Pull Request
+MIT — veja o arquivo `LICENSE`.
 
----
-
-
-
-**Desenvolvido com ❤️ para LGPD Compliance**
+**Desenvolvido para conformidade com a LGPD e o PPSI 2.0 (SGD/MGI).**
