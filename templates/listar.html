@@ -22,8 +22,9 @@
           <th>Atividade</th>
           <th>Unidade</th>
           <th>Base Legal</th>
+          <th>Situação</th>
           <th style="width:90px">Sensível</th>
-          <th style="width:160px">Completude</th>
+          <th style="width:140px">Completude</th>
           <th style="width:110px">Atualizado</th>
           <th style="width:100px"></th>
         </tr>
@@ -49,6 +50,13 @@
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
+          </td>
+          <td style="font-size:0.75rem;">
+            {% set sit = r.situacao or 'em_andamento' %}
+            <span class="badge {% if sit=='concluido' %}text-bg-success{% elif sit=='em_revisao' %}text-bg-warning text-dark{% elif sit=='em_andamento' %}text-bg-secondary{% else %}text-bg-light text-dark{% endif %}">
+              {{ {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(sit, sit) }}
+            </span>
+            <span style="color:#aaa;font-size:0.68rem;margin-left:0.2rem;">v{{ r.versao or '1.0' }}</span>
           </td>
           <td>
             {% if r.dados_sensiveis %}

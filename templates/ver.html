@@ -29,18 +29,25 @@
             {{ atividade.nome_atividade }}
           </h5>
           {% if atividade.unidade_controladora %}
-            <div style="font-size:0.8rem;color:#888;">{{ atividade.unidade_controladora }}</div>
+            <div style="font-size:0.8rem;color:#888;">
+              {{ atividade.unidade_controladora }} · v{{ atividade.versao or '1.0' }}
+            </div>
           {% endif %}
         </div>
-        {% if atividade.dados_sensiveis %}
-          <span class="badge-sensivel flex-shrink-0">Dados Sensíveis</span>
-        {% endif %}
+        <div class="d-flex flex-column gap-1 align-items-end flex-shrink-0">
+          {% if atividade.dados_sensiveis %}
+            <span class="badge-sensivel">Dados Sensíveis</span>
+          {% endif %}
+          <span class="badge text-bg-light text-dark">
+            {{ {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or 'Em andamento') }}
+          </span>
+        </div>
       </div>
 
       <!-- Score -->
       <div class="mt-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <span style="font-size:0.75rem;color:#888;font-weight:600;">Completude LGPD Art. 37</span>
+          <span style="font-size:0.75rem;color:#888;font-weight:600;">Completude PPSI 2.0 / LGPD Art. 37</span>
           <span style="font-size:0.85rem;font-weight:700;
             color:{{ '#198754' if score >= 80 else ('#fd7e14' if score >= 50 else '#dc3545') }}">
             {{ score }}%
@@ -68,7 +75,7 @@
     <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
       <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
                  color:var(--tre-azul);font-weight:700;margin-bottom:1rem;">
-        Detalhes do Tratamento
+        Detalhes do Tratamento <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#aaa;">(conteúdo mínimo — Guia PPSI 2.0)</span>
       </h6>
 
       {% macro row(label, value) %}
@@ -78,8 +85,15 @@
       </div>
       {% endmacro %}
 
-      {{ row("Finalidade", atividade.finalidade) }}
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.1 Identificação</h6>
+      {{ row("Responsável pelo preenchimento", atividade.responsavel_preenchimento) }}
+      {{ row("Situação do registro", {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or '—')) }}
+      {{ row("Versão", atividade.versao or '1.0') }}
+      {{ row("Unidade administrativa", atividade.unidade_controladora) }}
+      {{ row("Processo SEI", atividade.sistema_sei) }}
 
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.4 Finalidade e fundamentação</h6>
+      {{ row("Finalidade", atividade.finalidade) }}
       <div class="detail-row">
         <span class="detail-label">Base Legal</span>
         <span class="detail-value">
@@ -89,10 +103,14 @@
           {% else %}—{% endif %}
         </span>
       </div>
+      {{ row("Previsão normativa", atividade.previsao_normativa) }}
 
-      {{ row("Titulares", atividade.categorias_titulares) }}
-      {{ row("Dados Pessoais", atividade.categorias_dados) }}
-
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.2 Dados pessoais tratados</h6>
+      {{ row("Categorias de titulares", atividade.categorias_titulares) }}
+      {{ row("Estimativa de titulares", dict_estimativa_para_texto(atividade.titulares_estimativa)) }}
+      {{ row("Titulares c/ proteção reforçada", lista_para_texto(atividade.titulares_protecao_reforcada)) }}
+      {{ row("Tipos de dados", atividade.categorias_dados) }}
+      {{ row("Tipos de dados por categoria (FCI)", dict_tipos_para_texto(atividade.tipos_dados)) }}
       <div class="detail-row">
         <span class="detail-label">Dados Sensíveis</span>
         <span class="detail-value">
@@ -101,12 +119,28 @@
           {% else %}Não{% endif %}
         </span>
       </div>
+      {{ row("Tipos de dados sensíveis", lista_para_texto(atividade.tipos_dados_sensiveis)) }}
 
-      {{ row("Destinatários", atividade.destinatarios) }}
-      {{ row("Transf. Internacional", atividade.transferencia_inter) }}
-      {{ row("Prazo de Retenção", atividade.prazo_retencao) }}
-      {{ row("Medidas de Segurança", atividade.medidas_seguranca) }}
-      {{ row("Processo SEI", atividade.sistema_sei) }}
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.3 Ciclo de vida dos dados</h6>
+      {{ row("Fluxo de tratamento", atividade.fluxo_tratamento) }}
+      {{ row("Origem dos dados", lista_para_texto(atividade.origem_dados)) }}
+      {{ row("Local e meio de armazenamento", atividade.local_armazenamento) }}
+      {{ row("Prazo de retenção", atividade.prazo_retencao) }}
+      {{ row("Eliminação/destinação final", atividade.eliminacao_destinacao) }}
+      {{ row("Frequência do tratamento", atividade.frequencia_tratamento) }}
+
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.5 Agentes de tratamento</h6>
+      {{ row("Controladores", lista_para_texto(atividade.controladores)) }}
+      {{ row("Operadores", lista_para_texto(atividade.operadores)) }}
+
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.6 Compartilhamento e transferência</h6>
+      {{ row("Compartilhamento", atividade.destinatarios) }}
+      {{ row("Compartilhamentos detalhados", lista_para_texto(atividade.compartilhamentos)) }}
+      {{ row("Transferência internacional", atividade.transferencia_inter) }}
+      {{ row("Transferência internacional detalhada", lista_para_texto(atividade.transferencia_internacional)) }}
+
+      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">Segurança (Art. 46)</h6>
+      {{ row("Medidas de segurança", atividade.medidas_seguranca) }}
       {{ row("Observações", atividade.observacoes) }}
       {{ row("Criado em", atividade.criado_em) }}
       {{ row("Atualizado em", atividade.atualizado_em) }}
@@ -115,7 +149,38 @@
 
   <!-- Coluna lateral -->
   <div class="col-lg-4">
-    <!-- Histórico -->
+    <!-- Versões -->
+    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
+      <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
+                 color:var(--tre-azul);font-weight:700;margin-bottom:0.75rem;">
+        <i class="bi bi-arrow-counterclockwise me-1"></i> Versões do Registro
+      </h6>
+      {% if versoes %}
+        {% for v in versoes %}
+        <div style="font-size:0.75rem;border-bottom:1px solid #f0f0f0;padding:0.45rem 0;">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="badge text-bg-light text-dark">v{{ v.versao }}</span>
+            <span style="color:#aaa;font-size:0.68rem;">{{ v.criado_em[:16] }}</span>
+          </div>
+          <div style="color:#555;margin-top:0.2rem;">{{ v.sintese or '—' }}</div>
+          <div style="color:#aaa;font-size:0.68rem;">{{ v.responsavel or '' }}</div>
+          {% if v.versao != (atividade.versao or '1.0') %}
+          <form action="{{ url_for('restaurar', atividade_id=atividade.id, versao_id=v.id) }}"
+                method="post" class="mt-1"
+                onsubmit="return confirm('Restaurar o registro à v{{ v.versao }}? Uma nova versão será criada.');">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.7rem;">
+              <i class="bi bi-arrow-counterclockwise"></i> Restaurar v{{ v.versao }}
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:0.78rem;color:#aaa;margin:0;">Nenhuma versão registrada.</p>
+      {% endif %}
+    </div>
+
+    <!-- Histórico de alterações -->
     <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
       <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
                  color:var(--tre-azul);font-weight:700;margin-bottom:0.75rem;">

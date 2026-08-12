@@ -4,7 +4,7 @@ RoPA — Registro de Atividades de Tratamento
 LGPD compliance
 
 CLI para gestão do Registro de Atividades de Tratamento (RoPA)
-conforme LGPD (Lei 13.709/2018) e Resolução TSE 23.222/2010.
+conforme LGPD (Lei 13.709/2018).
 
 Uso:
     python ropa.py novo          Criar nova atividade de tratamento
@@ -28,6 +28,12 @@ from datetime import datetime
 from pathlib import Path
 
 import cnil_pia_importer
+from modelo_ppsi import (
+    CAMPOS_VALIDACAO, SITUACOES, CATEGORIAS_DADOS_FCI, JSON_FIELDS,
+    migrar_schema, proxima_versao, campos_estruturais, preenchido,
+    parse_lista, parse_dict_tipos, parse_estimativa,
+    lista_para_texto, dict_tipos_para_texto, dict_estimativa_para_texto,
+)
 
 # ── Dependências opcionais ────────────────────────────────────────────────────
 try:
@@ -55,9 +61,14 @@ except ImportError:
 DB_PATH = Path(os.environ.get("ROPA_DB_PATH", Path(__file__).parent / "ropa.db"))
 EXPORT_DIR = Path(__file__).parent / "exports"
 
-INSTITUICAO = "Instituição"
-UNIDADE_RESPONSAVEL = "Unidade de Proteção de Dados"
-ENCARREGADA = "Encarregado(a) de Proteção de Dados"
+# Identidade institucional — configurável via env (genérico por padrão)
+ORGANIZACAO   = os.environ.get("ROPA_ORGANIZACAO", "Organização")
+UNIDADE       = os.environ.get("ROPA_UNIDADE", "Unidade de Proteção de Dados")
+ENCARREGADO   = os.environ.get("ROPA_ENCARREGADO", "Encarregado(a) de Proteção de Dados")
+NORMAS_RODAPE = os.environ.get(
+    "ROPA_NORMAS_REFERENCIA",
+    "Documento produzido nos termos da LGPD – Lei 13.709/2018, Art. 37",
+)
 
 # Bases legais LGPD Art. 7º + Art. 11 (dados sensíveis)
 BASES_LEGAIS = {
@@ -75,18 +86,7 @@ BASES_LEGAIS = {
     "S-II":"Dados sensíveis – Obrigação legal / exercício de direitos / políticas públicas (Art. 11, II)",
 }
 
-# Campos obrigatórios e seu peso de completude (soma = 100)
-CAMPOS_VALIDACAO = {
-    "nome_atividade":         ("Nome da atividade de tratamento", 15),
-    "finalidade":             ("Finalidade do tratamento", 15),
-    "base_legal":             ("Base legal (Art. 7º LGPD)", 15),
-    "categorias_titulares":   ("Categorias de titulares", 10),
-    "categorias_dados":       ("Categorias de dados pessoais", 10),
-    "destinatarios":          ("Destinatários / compartilhamento", 10),
-    "prazo_retencao":         ("Prazo de retenção", 10),
-    "medidas_seguranca":      ("Medidas de segurança (Art. 46)", 10),
-    "unidade_controladora":   ("Unidade controladora / responsável", 5),
-}
+# CAMPOS_VALIDACAO (soma=100) e taxonomia FCI-ANPD vêm de modelo_ppsi.py
 
 # ── Banco de dados ────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ def get_conn() -> sqlite3.Connection:
 
 
 def init_db():
-    """Cria o schema se ainda não existir."""
+    """Cria o schema se ainda não existir e aplica migração PPSI 2.0."""
     with get_conn() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS atividades (
@@ -128,6 +128,7 @@ def init_db():
             valor_novo    TEXT,
             alterado_em   TEXT DEFAULT (datetime('now','localtime'))
         )""")
+        migrar_schema(conn)
 
 
 # ── Helpers de terminal ───────────────────────────────────────────────────────
@@ -197,32 +198,90 @@ def sim_nao(pergunta: str, padrao: bool = False) -> bool:
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
+def _json_prompt(atual: dict, campo: str, modo: str, descricao: str,
+                 obrigatorio: bool = False) -> str:
+    """Prompt para campo JSON, exibindo o texto correspondente como valor atual."""
+    val = atual.get(campo)
+    if modo == "lista":
+        txt = lista_para_texto(val)
+    elif modo == "dict":
+        txt = dict_tipos_para_texto(val)
+    elif modo == "estimativa":
+        txt = dict_estimativa_para_texto(val)
+    else:
+        txt = str(val or "")
+    return perguntar(campo, descricao, obrigatorio=obrigatorio, atual=txt)
+
+
 def _coletar_campos(atual: dict = None) -> dict:
     """Formulário interativo. Se `atual` fornecido, funciona como edição."""
     a = atual or {}
 
-    print(f"\n{NEGRITO}  ── Identificação ───────────────────────────────────────{RESET}")
+    print(f"\n{NEGRITO}  ── Identificação (Guia 4.1) ────────────────────────────────{RESET}")
     nome         = perguntar("nome_atividade",       "Nome da atividade de tratamento", obrigatorio=True, atual=a.get("nome_atividade",""))
-    unidade      = perguntar("unidade_controladora", "Unidade controladora / responsável", atual=a.get("unidade_controladora",""))
+    unidade      = perguntar("unidade_controladora", "Unidade administrativa responsável", atual=a.get("unidade_controladora",""))
+    resp_preench = perguntar("responsavel_preenchimento", "Responsável pelo preenchimento (nome, matrícula, data)", atual=a.get("responsavel_preenchimento",""))
+    situacao_opts= {k: v for k, v in SITUACOES}
+    situacao     = perguntar("situacao", "Situação do registro", opcoes=situacao_opts, atual=a.get("situacao","em_andamento"))
     sistema_sei  = perguntar("sistema_sei",          "Número SEI (processo/documento relacionado)", atual=a.get("sistema_sei",""))
 
-    print(f"\n{NEGRITO}  ── Tratamento ──────────────────────────────────────────{RESET}")
+    print(f"\n{NEGRITO}  ── Finalidade e fundamentação (Guia 4.4) ──────────────────{RESET}")
     finalidade   = perguntar("finalidade",   "Finalidade do tratamento", obrigatorio=True, atual=a.get("finalidade",""))
     base_legal   = perguntar("base_legal",   "Base legal", obrigatorio=True, opcoes=BASES_LEGAIS, atual=a.get("base_legal",""))
+    prev_norm    = perguntar("previsao_normativa", "Previsão normativa específica (norma e artigos)", atual=a.get("previsao_normativa",""))
 
-    print(f"\n{NEGRITO}  ── Dados ───────────────────────────────────────────────{RESET}")
-    cat_titulares= perguntar("categorias_titulares","Categorias de titulares (ex: servidores, mesários, candidatos)", atual=a.get("categorias_titulares",""))
-    cat_dados    = perguntar("categorias_dados",    "Categorias de dados (ex: nome, CPF, e-mail, endereço)", atual=a.get("categorias_dados",""))
+    print(f"\n{NEGRITO}  ── Dados pessoais tratados (Guia 4.2) ─────────────────────{RESET}")
+    cat_titulares= perguntar("categorias_titulares","Categorias de titulares (ex: servidores, cidadãos)", atual=a.get("categorias_titulares",""))
+    tit_estim    = _json_prompt(a, "titulares_estimativa", "estimativa",
+                                "Estimativa de titulares por categoria (formato 'categoria: quantidade' por linha)")
+    prot_ref     = _json_prompt(a, "titulares_protecao_reforcada", "lista",
+                                "Titulares com proteção reforçada (crianças, adolescentes, idosos...; um por linha)")
+    cat_dados    = perguntar("categorias_dados","Tipos de dados (resumo: nome, CPF, e-mail...)", atual=a.get("categorias_dados",""))
+    tipos_dados  = _json_prompt(a, "tipos_dados", "dict",
+                                "Tipos de dados por categoria FCI-ANPD (formato 'Categoria: tipo1; tipo2' por linha)\n  Categorias: " + "; ".join(CATEGORIAS_DADOS_FCI.values()))
     sensiveis    = sim_nao("Envolve dados sensíveis (Art. 5º, II)?", padrao=bool(a.get("dados_sensiveis",0)))
+    if sensiveis:
+        tipos_sens  = _json_prompt(a, "tipos_dados_sensiveis", "lista",
+                                   "Tipos de dados sensíveis (saúde, biometria, religião...; um por linha)")
+    else:
+        tipos_sens  = ""
 
-    print(f"\n{NEGRITO}  ── Compartilhamento ────────────────────────────────────{RESET}")
-    destinatarios= perguntar("destinatarios",       "Destinatários / órgãos com quem são compartilhados", atual=a.get("destinatarios",""))
-    transf_inter = perguntar("transferencia_inter", "Transferência internacional? (N/A se não houver)", atual=a.get("transferencia_inter","N/A"))
+    print(f"\n{NEGRITO}  ── Ciclo de vida dos dados (Guia 4.3) ─────────────────────{RESET}")
+    fluxo        = perguntar("fluxo_tratamento","Descrição do fluxo de tratamento (coleta → uso → eliminação)", atual=a.get("fluxo_tratamento",""))
+    origem       = _json_prompt(a, "origem_dados", "lista",
+                                "Origem dos dados (formulário, outro sistema, bases públicas...; um por linha)")
+    local_arm    = perguntar("local_armazenamento","Local e meio de armazenamento (sistema, base, nuvem, físico)", atual=a.get("local_armazenamento",""))
+    prazo        = perguntar("prazo_retencao",   "Período de retenção", atual=a.get("prazo_retencao",""))
+    eliminacao   = perguntar("eliminacao_destinacao","Forma de eliminação/destinação final (ex: expurgo, anonimização)", atual=a.get("eliminacao_destinacao",""))
+    frequencia   = perguntar("frequencia_tratamento","Frequência do tratamento (contínua, mensal, eventual)", atual=a.get("frequencia_tratamento",""))
 
-    print(f"\n{NEGRITO}  ── Retenção e Segurança ────────────────────────────────{RESET}")
-    prazo        = perguntar("prazo_retencao",   "Prazo de retenção (ex: 5 anos conforme Lei X)", atual=a.get("prazo_retencao",""))
+    print(f"\n{NEGRITO}  ── Agentes de tratamento (Guia 4.5) ───────────────────────{RESET}")
+    controladores= _json_prompt(a, "controladores", "lista",
+                                "Controladores (razão social; CNPJ; responsabilidade; um por linha)")
+    operadores   = _json_prompt(a, "operadores", "lista",
+                                "Operadores (razão social; CNPJ; instrumento contratual; um por linha)")
+
+    print(f"\n{NEGRITO}  ── Compartilhamento e transf. internacional (Guia 4.6) ─────{RESET}")
+    destinatarios= perguntar("destinatarios",       "Compartilhamento / destinatários", atual=a.get("destinatarios",""))
+    compart      = _json_prompt(a, "compartilhamentos", "lista",
+                                "Compartilhamentos (órgão/sistema; finalidade; base; um por linha)")
+    transf_inter = _json_prompt(a, "transferencia_internacional", "lista",
+                                "Transferência internacional (país; destinatário; tipos; mecanismo; um por linha, 'N/A' se não houver)")
+    if not transf_inter:
+        transf_inter = '["N/A"]'
+
+    print(f"\n{NEGRITO}  ── Retenção e Segurança ───────────────────────────────────{RESET}")
     medidas      = perguntar("medidas_seguranca","Medidas de segurança adotadas (Art. 46 LGPD)", atual=a.get("medidas_seguranca",""))
     obs          = perguntar("observacoes",      "Observações adicionais", atual=a.get("observacoes",""))
+
+    def _j(v):
+        import json as _json
+        if isinstance(v, str):
+            try:
+                return _json.dumps(_json.loads(v), ensure_ascii=False)
+            except Exception:
+                return _json.dumps(v, ensure_ascii=False)
+        return _json.dumps(v, ensure_ascii=False)
 
     return dict(
         nome_atividade=nome,
@@ -232,12 +291,28 @@ def _coletar_campos(atual: dict = None) -> dict:
         categorias_dados=cat_dados,
         dados_sensiveis=int(sensiveis),
         destinatarios=destinatarios,
-        transferencia_inter=transf_inter,
+        transferencia_inter="N/A",
         prazo_retencao=prazo,
         medidas_seguranca=medidas,
         unidade_controladora=unidade,
         sistema_sei=sistema_sei,
         observacoes=obs,
+        responsavel_preenchimento=resp_preench,
+        situacao=situacao,
+        previsao_normativa=prev_norm,
+        titulares_estimativa=_j(parse_estimativa(tit_estim)),
+        titulares_protecao_reforcada=_j(parse_lista(prot_ref)),
+        tipos_dados=_j(parse_dict_tipos(tipos_dados)),
+        tipos_dados_sensiveis=_j(parse_lista(tipos_sens)),
+        fluxo_tratamento=fluxo,
+        origem_dados=_j(parse_lista(origem)),
+        local_armazenamento=local_arm,
+        eliminacao_destinacao=eliminacao,
+        frequencia_tratamento=frequencia,
+        controladores=_j(parse_lista(controladores)),
+        operadores=_j(parse_lista(operadores)),
+        compartilhamentos=_j(parse_lista(compart)),
+        transferencia_internacional=_j(parse_lista(transf_inter)),
     )
 
 
@@ -245,21 +320,33 @@ def cmd_novo(_args):
     banner()
     print(f"{NEGRITO}  Nova Atividade de Tratamento{RESET}")
     dados = _coletar_campos()
+    dados["versao"] = "1.0"
+    dados["situacao"] = dados.get("situacao") or "em_andamento"
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO atividades
               (nome_atividade, finalidade, base_legal, categorias_titulares,
                categorias_dados, dados_sensiveis, destinatarios, transferencia_inter,
                prazo_retencao, medidas_seguranca, unidade_controladora, sistema_sei,
-               observacoes)
+               observacoes, responsavel_preenchimento, situacao, versao,
+               titulares_estimativa, titulares_protecao_reforcada, tipos_dados,
+               tipos_dados_sensiveis, fluxo_tratamento, origem_dados,
+               local_armazenamento, eliminacao_destinacao, frequencia_tratamento,
+               previsao_normativa, controladores, operadores, compartilhamentos,
+               transferencia_internacional)
             VALUES
               (:nome_atividade,:finalidade,:base_legal,:categorias_titulares,
                :categorias_dados,:dados_sensiveis,:destinatarios,:transferencia_inter,
                :prazo_retencao,:medidas_seguranca,:unidade_controladora,:sistema_sei,
-               :observacoes)
+               :observacoes,:responsavel_preenchimento,:situacao,:versao,
+               :titulares_estimativa,:titulares_protecao_reforcada,:tipos_dados,
+               :tipos_dados_sensiveis,:fluxo_tratamento,:origem_dados,
+               :local_armazenamento,:eliminacao_destinacao,:frequencia_tratamento,
+               :previsao_normativa,:controladores,:operadores,:compartilhamentos,
+               :transferencia_internacional)
         """, dados)
         novo_id = cur.lastrowid
-    ok(f"Atividade criada com ID #{novo_id}")
+    ok(f"Atividade criada com ID #{novo_id} (versão {dados['versao']})")
     _exibir_pontuacao(dict(dados))
 
 
@@ -304,25 +391,49 @@ def cmd_ver(args):
     sensiveis = f"{VERMELHO}Sim{RESET}" if r["dados_sensiveis"] else "Não"
 
     print(f"  {NEGRITO}#{r['id']}  {r['nome_atividade']}{RESET}\n")
+
+    def _lbl(campo, val, modo="lista"):
+        v = val
+        if campo in JSON_FIELDS or modo == "lista":
+            v = lista_para_texto(val)
+        return v or ""
+
     linhas = [
-        ("Unidade controladora", r["unidade_controladora"]),
-        ("SEI relacionado",      r["sistema_sei"]),
-        ("Finalidade",           r["finalidade"]),
-        ("Base legal",           base_desc),
-        ("Titulares",            r["categorias_titulares"]),
-        ("Dados pessoais",       r["categorias_dados"]),
-        ("Dados sensíveis",      sensiveis),
-        ("Destinatários",        r["destinatarios"]),
-        ("Transf. internacional",r["transferencia_inter"]),
-        ("Prazo de retenção",    r["prazo_retencao"]),
-        ("Medidas de segurança", r["medidas_seguranca"]),
-        ("Observações",          r["observacoes"]),
-        ("Criado em",            r["criado_em"]),
-        ("Atualizado em",        r["atualizado_em"]),
+        ("Situação",              r.get("situacao") or "em_andamento"),
+        ("Versão",                r.get("versao") or "1.0"),
+        ("Unidade controladora",  r["unidade_controladora"]),
+        ("Responsável pelo preenchimento", r.get("responsavel_preenchimento")),
+        ("SEI relacionado",       r["sistema_sei"]),
+        ("Finalidade",            r["finalidade"]),
+        ("Base legal",            base_desc),
+        ("Previsão normativa",    r.get("previsao_normativa")),
+        ("Titulares",             r["categorias_titulares"]),
+        ("Estimativa titulares",  dict_estimativa_para_texto(r.get("titulares_estimativa"))),
+        ("Proteção reforçada",    lista_para_texto(r.get("titulares_protecao_reforcada"))),
+        ("Dados pessoais",        r["categorias_dados"]),
+        ("Tipos de dados (FCI)",  dict_tipos_para_texto(r.get("tipos_dados"))),
+        ("Dados sensíveis",       sensiveis),
+        ("Tipos sensíveis",       lista_para_texto(r.get("tipos_dados_sensiveis"))),
+        ("Fluxo de tratamento",   r.get("fluxo_tratamento")),
+        ("Origem dos dados",      lista_para_texto(r.get("origem_dados"))),
+        ("Local armazenamento",   r.get("local_armazenamento")),
+        ("Prazo de retenção",     r["prazo_retencao"]),
+        ("Eliminação/destinação", r.get("eliminacao_destinacao")),
+        ("Frequência",            r.get("frequencia_tratamento")),
+        ("Controladores",         lista_para_texto(r.get("controladores"))),
+        ("Operadores",            lista_para_texto(r.get("operadores"))),
+        ("Compartilhamento",      r["destinatarios"]),
+        ("Compartilhamentos",     lista_para_texto(r.get("compartilhamentos"))),
+        ("Transf. internacional", r["transferencia_inter"]),
+        ("Transf. int. detalhada", lista_para_texto(r.get("transferencia_internacional"))),
+        ("Medidas de segurança",  r["medidas_seguranca"]),
+        ("Observações",           r["observacoes"]),
+        ("Criado em",             r["criado_em"]),
+        ("Atualizado em",         r["atualizado_em"]),
     ]
     for label, val in linhas:
         v = val or f"{CINZA}—{RESET}"
-        print(f"  {CINZA}{label:<26}{RESET} {v}")
+        print(f"  {CINZA}{label:<30}{RESET} {v}")
 
     print()
     _exibir_pontuacao(r)
@@ -345,8 +456,8 @@ def cmd_editar(args):
 
     novos = _coletar_campos(atual=atual)
 
-    # Registrar histórico de alterações
     with get_conn() as conn:
+        # Auditoria campo a campo
         for campo, (_, _peso) in CAMPOS_VALIDACAO.items():
             if novos.get(campo) != atual.get(campo):
                 conn.execute("""
@@ -354,8 +465,22 @@ def cmd_editar(args):
                     VALUES (?,?,?,?)
                 """, (args.id, campo, atual.get(campo), novos.get(campo)))
 
+        # Versionamento semântico (Guia 4.1.6)
+        estrutural = any(novos.get(c) != atual.get(c) for c in campos_estruturais())
+        nova_versao = proxima_versao(atual.get("versao"), estrutural)
+        alterados = [desc for campo, (desc, _) in CAMPOS_VALIDACAO.items()
+                     if novos.get(campo) != atual.get(campo)]
+        sintese = f"v{nova_versao} – " + (", ".join(alterados[:6]) if alterados else "ajuste menor")
+        novos["versao"] = nova_versao
         novos["atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         novos["id"] = args.id
+
+        snapshot = json.dumps({**atual, **novos}, ensure_ascii=False, default=str)
+        conn.execute("""
+            INSERT INTO versoes (atividade_id, versao, sintese, responsavel, snapshot)
+            VALUES (?,?,?,?,?)
+        """, (args.id, nova_versao, sintese, "CLI", snapshot))
+
         conn.execute("""
             UPDATE atividades SET
               nome_atividade=:nome_atividade, finalidade=:finalidade,
@@ -364,23 +489,34 @@ def cmd_editar(args):
               destinatarios=:destinatarios, transferencia_inter=:transferencia_inter,
               prazo_retencao=:prazo_retencao, medidas_seguranca=:medidas_seguranca,
               unidade_controladora=:unidade_controladora, sistema_sei=:sistema_sei,
-              observacoes=:observacoes, atualizado_em=:atualizado_em
+              observacoes=:observacoes, responsavel_preenchimento=:responsavel_preenchimento,
+              situacao=:situacao, versao=:versao,
+              titulares_estimativa=:titulares_estimativa,
+              titulares_protecao_reforcada=:titulares_protecao_reforcada,
+              tipos_dados=:tipos_dados, tipos_dados_sensiveis=:tipos_dados_sensiveis,
+              fluxo_tratamento=:fluxo_tratamento, origem_dados=:origem_dados,
+              local_armazenamento=:local_armazenamento,
+              eliminacao_destinacao=:eliminacao_destinacao,
+              frequencia_tratamento=:frequencia_tratamento,
+              previsao_normativa=:previsao_normativa, controladores=:controladores,
+              operadores=:operadores, compartilhamentos=:compartilhamentos,
+              transferencia_internacional=:transferencia_internacional,
+              atualizado_em=:atualizado_em
             WHERE id=:id
         """, novos)
 
-    ok(f"Atividade #{args.id} atualizada.")
+    ok(f"Atividade #{args.id} atualizada (versão {nova_versao}).")
     _exibir_pontuacao(novos)
 
 
 # ── Validação ─────────────────────────────────────────────────────────────────
 
 def _pontuacao(atividade: dict) -> tuple[int, list]:
-    """Retorna (score 0-100, lista de campos faltando)."""
+    """Retorna (score 0-100, lista de campos faltando). Alinhado ao conteúdo mínimo do Guia PPSI 2.0."""
     score = 0
     faltando = []
     for campo, (descricao, peso) in CAMPOS_VALIDACAO.items():
-        val = atividade.get(campo)
-        if val and str(val).strip() and str(val).strip().upper() not in ("N/A", "NENHUM", "—"):
+        if preenchido(campo, atividade.get(campo)):
             score += peso
         else:
             faltando.append((descricao, peso))
@@ -479,6 +615,21 @@ def cmd_exportar(args):
             ok(f"XLSX → {path}")
 
 
+def _render_valor(campo: str, val) -> str:
+    """Renderiza valor para exportação (JSON multivalorado vira texto legível)."""
+    if campo == "dados_sensiveis":
+        return "Sim" if val else "Não"
+    if campo == "base_legal" and val:
+        return f"{val} – {BASES_LEGAIS.get(val, val)}"
+    if campo in ("titulares_estimativa",):
+        return dict_estimativa_para_texto(val).replace("\n", "; ")
+    if campo in ("tipos_dados",):
+        return dict_tipos_para_texto(val).replace("\n", "; ")
+    if campo in JSON_FIELDS:
+        return lista_para_texto(val).replace("\n", "; ")
+    return str(val or "")
+
+
 def _exportar_xlsx(registros: list[dict], path: Path):
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -491,18 +642,37 @@ def _exportar_xlsx(registros: list[dict], path: Path):
 
     colunas_exibir = [
         ("id",                   "ID",                  6),
-        ("nome_atividade",        "Atividade",           40),
-        ("finalidade",            "Finalidade",          30),
-        ("base_legal",            "Base Legal",          8),
-        ("categorias_titulares",  "Titulares",           25),
-        ("categorias_dados",      "Dados",               25),
-        ("dados_sensiveis",       "Sensível",            9),
-        ("destinatarios",         "Destinatários",       25),
-        ("prazo_retencao",        "Retenção",            20),
-        ("medidas_seguranca",     "Medidas Seg.",        30),
-        ("unidade_controladora",  "Unidade",             20),
-        ("sistema_sei",           "SEI",                 18),
-        ("atualizado_em",         "Atualizado",          16),
+        ("nome_atividade",       "Atividade",           36),
+        ("situacao",             "Situação",            12),
+        ("versao",               "Versão",              8),
+        ("finalidade",           "Finalidade",          30),
+        ("base_legal",           "Base Legal",          8),
+        ("unidade_controladora", "Unidade",             20),
+        ("responsavel_preenchimento", "Responsável",    22),
+        ("previsao_normativa",   "Previsão normativa",  22),
+        ("categorias_titulares", "Titulares",           22),
+        ("titulares_estimativa", "Estimativa titulares",20),
+        ("titulares_protecao_reforcada", "Proteção reforçada", 18),
+        ("categorias_dados",     "Dados",               24),
+        ("tipos_dados",          "Tipos de dados (FCI)",30),
+        ("dados_sensiveis",      "Sensível",            9),
+        ("tipos_dados_sensiveis","Tipos sensíveis",     22),
+        ("fluxo_tratamento",     "Fluxo",               30),
+        ("origem_dados",         "Origem",              22),
+        ("local_armazenamento",  "Armazenamento",       22),
+        ("prazo_retencao",       "Retenção",            20),
+        ("eliminacao_destinacao","Eliminação",          22),
+        ("frequencia_tratamento","Frequência",          14),
+        ("controladores",        "Controladores",       22),
+        ("operadores",           "Operadores",          22),
+        ("destinatarios",        "Compartilhamento",    22),
+        ("compartilhamentos",    "Compartilhamentos",   24),
+        ("transferencia_inter",  "Transf. int.",        14),
+        ("transferencia_internacional", "Transf. int. detalhada", 24),
+        ("medidas_seguranca",    "Medidas Seg.",        30),
+        ("sistema_sei",          "SEI",                 18),
+        ("observacoes",          "Observações",         22),
+        ("atualizado_em",        "Atualizado",          16),
     ]
 
     for col_idx, (_, titulo, largura) in enumerate(colunas_exibir, 1):
@@ -517,11 +687,7 @@ def _exportar_xlsx(registros: list[dict], path: Path):
     for row_idx, reg in enumerate(registros, 2):
         fill = SENSIVEL_FILL if reg.get("dados_sensiveis") else (ALT_FILL if row_idx % 2 == 0 else None)
         for col_idx, (campo, _, _) in enumerate(colunas_exibir, 1):
-            val = reg.get(campo, "")
-            if campo == "dados_sensiveis":
-                val = "Sim" if val else "Não"
-            elif campo == "base_legal":
-                val = f"{val} – {BASES_LEGAIS.get(val,'')}" if val else ""
+            val = _render_valor(campo, reg.get(campo, ""))
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             cell.alignment = Alignment(wrap_text=True, vertical="top")
             if fill:
@@ -581,8 +747,8 @@ def _gerar_pdf(registros: list[dict], path: Path):
 
     # ── Capa ──
     story.append(Spacer(1, 1*cm))
-    story.append(Paragraph(INSTITUICAO, titulo_style))
-    story.append(Paragraph(UNIDADE_RESPONSAVEL, sub_style))
+    story.append(Paragraph(ORGANIZACAO, titulo_style))
+    story.append(Paragraph(UNIDADE, sub_style))
     story.append(Spacer(1, 0.3*cm))
     story.append(HRFlowable(width="100%", thickness=2, color=cor_azul))
     story.append(Spacer(1, 0.3*cm))
@@ -593,7 +759,7 @@ def _gerar_pdf(registros: list[dict], path: Path):
     data_geracao = datetime.now().strftime("%d/%m/%Y às %H:%M")
     meta = [
         ["Data de geração:", data_geracao,
-         "Encarregada (DPO):", ENCARREGADA],
+         "Encarregado (DPO):", ENCARREGADO],
         ["Total de atividades:", str(len(registros)),
          "Versão:", f"RoPA-{datetime.now().strftime('%Y%m%d')}"],
     ]
@@ -661,20 +827,37 @@ def _gerar_pdf(registros: list[dict], path: Path):
     story.append(HRFlowable(width="100%", thickness=0.5, color=cor_cinza))
 
     campos_ficha = [
-        ("finalidade",           "Finalidade"),
-        ("base_legal",           "Base legal (LGPD)"),
-        ("categorias_titulares", "Categorias de titulares"),
-        ("categorias_dados",     "Dados pessoais envolvidos"),
-        ("dados_sensiveis",      "Dados sensíveis (Art. 5º, II)"),
-        ("destinatarios",        "Destinatários / compartilhamento"),
-        ("transferencia_inter",  "Transferência internacional"),
-        ("prazo_retencao",       "Prazo de retenção"),
-        ("medidas_seguranca",    "Medidas de segurança (Art. 46)"),
-        ("unidade_controladora", "Unidade controladora"),
-        ("sistema_sei",          "Processo SEI relacionado"),
-        ("observacoes",          "Observações"),
-        ("criado_em",            "Data de criação"),
-        ("atualizado_em",        "Última atualização"),
+        ("situacao",              "Situação do registro"),
+        ("versao",                "Versão"),
+        ("responsavel_preenchimento", "Responsável pelo preenchimento"),
+        ("unidade_controladora",  "Unidade controladora"),
+        ("sistema_sei",           "Processo SEI relacionado"),
+        ("finalidade",            "Finalidade"),
+        ("base_legal",            "Base legal (LGPD)"),
+        ("previsao_normativa",    "Previsão normativa específica"),
+        ("categorias_titulares",  "Categorias de titulares"),
+        ("titulares_estimativa",  "Estimativa de titulares"),
+        ("titulares_protecao_reforcada", "Titulares com proteção reforçada"),
+        ("categorias_dados",      "Dados pessoais envolvidos"),
+        ("tipos_dados",           "Tipos de dados (FCI-ANPD)"),
+        ("dados_sensiveis",       "Dados sensíveis (Art. 5º, II)"),
+        ("tipos_dados_sensiveis", "Tipos de dados sensíveis"),
+        ("fluxo_tratamento",      "Fluxo de tratamento"),
+        ("origem_dados",          "Origem dos dados"),
+        ("local_armazenamento",   "Local e meio de armazenamento"),
+        ("prazo_retencao",        "Prazo de retenção"),
+        ("eliminacao_destinacao", "Eliminação/destinação final"),
+        ("frequencia_tratamento", "Frequência do tratamento"),
+        ("controladores",         "Controladores"),
+        ("operadores",            "Operadores"),
+        ("destinatarios",         "Compartilhamento"),
+        ("compartilhamentos",     "Compartilhamentos detalhados"),
+        ("transferencia_inter",   "Transferência internacional"),
+        ("transferencia_internacional", "Transferência internacional detalhada"),
+        ("medidas_seguranca",     "Medidas de segurança (Art. 46)"),
+        ("observacoes",           "Observações"),
+        ("criado_em",             "Data de criação"),
+        ("atualizado_em",         "Última atualização"),
     ]
 
     for reg in registros:
@@ -702,11 +885,7 @@ def _gerar_pdf(registros: list[dict], path: Path):
 
         ficha_data = []
         for campo, label in campos_ficha:
-            val = reg.get(campo, "")
-            if campo == "dados_sensiveis":
-                val = "Sim" if val else "Não"
-            elif campo == "base_legal" and val:
-                val = f"{val} – {BASES_LEGAIS.get(val, val)}"
+            val = _render_valor(campo, reg.get(campo, ""))
             val_str = str(val).strip() if val else "—"
             ficha_data.append([
                 Paragraph(label, label_style),
@@ -731,13 +910,12 @@ def _gerar_pdf(registros: list[dict], path: Path):
     story.append(HRFlowable(width="100%", thickness=0.5, color=cor_cinza))
     story.append(Spacer(1, 0.2*cm))
     story.append(Paragraph(
-        f"{INSTITUICAO}  ·  {UNIDADE_RESPONSAVEL}  ·  "
-        f"Encarregada: {ENCARREGADA}  ·  Gerado em {data_geracao}",
+        f"{ORGANIZACAO}  ·  {UNIDADE}  ·  "
+        f"Encarregado: {ENCARREGADO}  ·  Gerado em {data_geracao}",
         rodape_style
     ))
     story.append(Paragraph(
-        "Documento produzido nos termos da LGPD – Lei 13.709/2018, Art. 37 | "
-        "Resolução TSE 23.222/2010 | Res. nº 971/2026",
+        NORMAS_RODAPE,
         rodape_style
     ))
 
@@ -796,95 +974,97 @@ def cmd_seed(_args):
     banner()
     exemplos = [
         dict(
-            nome_atividade="Cadastro de Mesários Voluntários",
-            finalidade="Recrutamento e gestão de mesários para eleições, conforme Lei 9.504/1997",
-            base_legal="III",
-            categorias_titulares="Eleitores voluntários cadastrados no sistema Mesário",
-            categorias_dados="Nome completo, CPF, título de eleitor, e-mail, telefone, endereço",
-            dados_sensiveis=0,
-            destinatarios="Unidade de TI, cartórios eleitorais, TSE (integração sistêmica)",
-            transferencia_inter="N/A",
-            prazo_retencao="5 anos após o pleito, conforme Res. TSE 23.222/2010",
-            medidas_seguranca="Acesso restrito por perfil no ELO, autenticação GOV.BR, logs de auditoria",
-            unidade_controladora="Unidade de TI",
-            sistema_sei="SEI 0006491-21.2026.6.16.8000",
-            observacoes="PAD 004717/2022 – sistema em processo de modernização"
-        ),
-        dict(
-            nome_atividade="Registro de Candidaturas (CAND)",
-            finalidade="Processamento de pedidos de registro de candidatura para pleitos eleitorais",
-            base_legal="III",
-            categorias_titulares="Candidatos, vices, suplentes registrados na Justiça Eleitoral",
-            categorias_dados="Nome, CPF, título eleitoral, filiação partidária, bens declarados, foto",
-            dados_sensiveis=0,
-            destinatarios="TSE (DivulgaCand), partidos políticos, imprensa (dados públicos)",
-            transferencia_inter="N/A",
-            prazo_retencao="Indeterminado – registro histórico eleitoral permanente",
-            medidas_seguranca="Sistema CAND/TSE com controle de acesso por OAB/partido; dados públicos via DivulgaCand",
-            unidade_controladora="SECJUD – Secretaria Judiciária e de Gestão da Informação",
-            sistema_sei="",
-            observacoes=""
-        ),
-        dict(
-            nome_atividade="Folha de Pagamento de Servidores",
-            finalidade="Processamento da remuneração, encargos e benefícios dos servidores",
+            nome_atividade="Folha de Pagamento de Colaboradores",
+            finalidade="Processamento da remuneração, encargos e benefícios dos colaboradores da Organização",
             base_legal="II",
-            categorias_titulares="Servidores efetivos, comissionados e requisitados",
-            categorias_dados="Nome, CPF, matrícula SIAPE, conta bancária, dependentes, dados previdenciários",
+            categorias_titulares="Colaboradores efetivos, comissionados e contratados",
+            categorias_dados="Nome, CPF, matrícula, conta bancária, dependentes, dados previdenciários",
             dados_sensiveis=0,
-            destinatarios="Receita Federal, PSSS, SIAPE/Ministério da Gestão, CEF",
+            destinatarios="Órgão de arrecadação federal, instituição financeira pagadora, sistema de gestão de pessoas",
             transferencia_inter="N/A",
-            prazo_retencao="20 anos conforme Res. TSE e TCU; documentos previdenciários: permanente",
-            medidas_seguranca="SIAPE com autenticação gov.br; acesso restrito à SECGP; canais cifrados com Receita Federal",
-            unidade_controladora="SECGP – Seção de Gestão de Pessoas",
+            prazo_retencao="20 anos para documentos trabalhistas; dados previdenciários: permanente",
+            medidas_seguranca="Acesso restrito por perfil na área de gestão de pessoas; autenticação forte; canais cifrados com órgãos externos",
+            unidade_controladora="Unidade de Gestão de Pessoas",
             sistema_sei="",
             observacoes=""
         ),
         dict(
-            nome_atividade="Processo Administrativo Disciplinar (PAD)",
-            finalidade="Apuração de irregularidades funcionais de servidores, conforme Lei 8.112/1990",
-            base_legal="VI",
-            categorias_titulares="Servidores investigados, testemunhas, denunciantes",
-            categorias_dados="Nome, matrícula, histórico funcional, depoimentos, documentos sigilosos",
+            nome_atividade="Recrutamento e Seleção de Pessoal",
+            finalidade="Gestão de processos seletivos e concursos para ingresso de novos colaboradores",
+            base_legal="III",
+            categorias_titulares="Candidatos inscritos em processos seletivos",
+            categorias_dados="Nome, CPF, e-mail, telefone, escolaridade, histórico profissional, fotografia",
             dados_sensiveis=0,
-            destinatarios="Comissão processante, Presidência, CGU (se cabível)",
+            destinatarios="Comissão organizadora do certame; sistema oficial de inscrições",
             transferencia_inter="N/A",
-            prazo_retencao="10 anos após arquivamento; condenações: permanente",
-            medidas_seguranca="Processo SEI com restrição de acesso; perfis específicos; impressão controlada",
-            unidade_controladora="SECAD – Secretaria de Administração",
+            prazo_retencao="5 anos após o encerramento do certame, conforme normas internas",
+            medidas_seguranca="Acesso restrito à comissão; ambiente controlado de provas; registros de auditoria",
+            unidade_controladora="Unidade de Gestão de Pessoas",
             sistema_sei="",
-            observacoes="Dados de caráter sigiloso – acesso restrito nos termos da LAI"
+            observacoes=""
         ),
         dict(
-            nome_atividade="Monitoramento por Câmeras (CFTV)",
-            finalidade="Segurança patrimonial e controle de acesso às dependências da Instituição",
+            nome_atividade="Atendimento ao Cidadão (Protocolo e Ouvidoria)",
+            finalidade="Registro e tramitação de manifestações, solicitações e pedidos de informação dos cidadãos",
+            base_legal="III",
+            categorias_titulares="Cidadãos, solicitantes, manifestantes",
+            categorias_dados="Nome, CPF, e-mail, telefone, conteúdo da manifestação, dados do atendimento",
+            dados_sensiveis=0,
+            destinatarios="Áreas internas responsáveis pela resposta; ouvidoria",
+            transferencia_inter="N/A",
+            prazo_retencao="Prazo legal de guarda de documentos administrativos, conforme normas internas",
+            medidas_seguranca="Sistema de protocolo com perfis de acesso; sigilo das manifestações; trilha de auditoria",
+            unidade_controladora="Unidade de Atendimento ao Cidadão",
+            sistema_sei="",
+            observacoes=""
+        ),
+        dict(
+            nome_atividade="Controle de Acesso às Dependências",
+            finalidade="Segurança patrimonial e controle de acesso de colaboradores e visitantes às dependências",
             base_legal="IX",
-            categorias_titulares="Servidores, visitantes, prestadores de serviço",
-            categorias_dados="Imagens de vídeo com identificação facial incidental",
+            categorias_titulares="Colaboradores, visitantes, prestadores de serviço",
+            categorias_dados="Nome, CPF, horários de entrada e saída, imagem de identificação, dados biométricos",
             dados_sensiveis=1,
-            destinatarios="Segurança institucional; Polícia Federal (incidentes); não há compartilhamento rotineiro",
+            destinatarios="Equipe de segurança institucional; autoridades policiais (incidentes); sem compartilhamento rotineiro",
             transferencia_inter="N/A",
             prazo_retencao="30 dias em sobrescrita contínua; incidentes: até encerramento de apuração",
-            medidas_seguranca="DVR com acesso físico restrito; sala de monitoramento com controle de acesso; sem transmissão externa",
-            unidade_controladora="ASSEG – Seção de Infraestrutura e Segurança",
+            medidas_seguranca="Sistema de acesso com registro individual; sala de monitoramento com controle de acesso; sem transmissão externa",
+            unidade_controladora="Unidade de Infraestrutura e Segurança",
             sistema_sei="",
-            observacoes="RIPD recomendado (Art. 10, §3 LGPD – legítimo interesse + Art. 5º, II – dado sensível biométrico incidental)"
+            observacoes="RIPD recomendado (Art. 10, §3 LGPD – legítimo interesse + Art. 5º, II – dado sensível biométrico)"
+        ),
+        dict(
+            nome_atividade="Processo Administrativo Disciplinar",
+            finalidade="Apuração de irregularidades funcionais de colaboradores, conforme legislação aplicável",
+            base_legal="VI",
+            categorias_titulares="Colaboradores investigados, testemunhas, denunciantes",
+            categorias_dados="Nome, matrícula, histórico funcional, depoimentos, documentos sigilosos",
+            dados_sensiveis=0,
+            destinatarios="Comissão processante, autoridade máxima, órgão de controle (se cabível)",
+            transferencia_inter="N/A",
+            prazo_retencao="10 anos após arquivamento; condenações: permanente",
+            medidas_seguranca="Processo eletrônico com restrição de acesso; perfis específicos; impressão controlada",
+            unidade_controladora="Unidade de Administração",
+            sistema_sei="",
+            observacoes="Dados de caráter sigiloso – acesso restrito nos termos da legislação de acesso à informação"
         ),
     ]
 
     with get_conn() as conn:
         for ex in exemplos:
+            ex["situacao"] = "concluido"
+            ex["versao"] = "1.0"
             conn.execute("""
                 INSERT INTO atividades
                   (nome_atividade, finalidade, base_legal, categorias_titulares,
                    categorias_dados, dados_sensiveis, destinatarios, transferencia_inter,
                    prazo_retencao, medidas_seguranca, unidade_controladora, sistema_sei,
-                   observacoes)
+                   observacoes, situacao, versao)
                 VALUES
                   (:nome_atividade,:finalidade,:base_legal,:categorias_titulares,
                    :categorias_dados,:dados_sensiveis,:destinatarios,:transferencia_inter,
                    :prazo_retencao,:medidas_seguranca,:unidade_controladora,:sistema_sei,
-                   :observacoes)
+                   :observacoes,:situacao,:versao)
             """, ex)
 
     ok(f"{len(exemplos)} atividades de exemplo inseridas.")
