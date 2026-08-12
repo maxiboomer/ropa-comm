@@ -3,254 +3,213 @@
 {% block page_title %}Atividade #{{ atividade.id }}{% endblock %}
 
 {% block content %}
-<div class="d-flex gap-2 mb-3">
-  <a href="{{ url_for('listar') }}" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-arrow-left"></i> Voltar
-  </a>
-  <a href="{{ url_for('editar', atividade_id=atividade.id) }}" class="btn btn-sm btn-outline-primary">
-    <i class="bi bi-pencil"></i> Editar
-  </a>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="{{ url_for('listar') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+  <a href="{{ url_for('editar', atividade_id=atividade.id) }}" class="btn btn-sm btn-tre-soft"><i class="bi bi-pencil"></i> Editar</a>
   <form action="{{ url_for('excluir', atividade_id=atividade.id) }}" method="post" class="ms-auto"
         onsubmit="return confirm('Remover esta atividade?')">
-    <button class="btn btn-sm btn-outline-danger">
-      <i class="bi bi-trash"></i> Remover
-    </button>
+    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Remover</button>
   </form>
 </div>
 
 <div class="row g-3">
-  <!-- Coluna principal -->
-  <div class="col-lg-8">
-    <!-- Cabeçalho -->
-    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
-      <div class="d-flex align-items-start justify-content-between gap-2">
-        <div>
-          <h5 style="color:var(--tre-azul);font-weight:700;margin-bottom:0.2rem;">
-            {{ atividade.nome_atividade }}
-          </h5>
-          {% if atividade.unidade_controladora %}
-            <div style="font-size:0.8rem;color:#888;">
-              {{ atividade.unidade_controladora }} · v{{ atividade.versao or '1.0' }}
-            </div>
-          {% endif %}
-        </div>
-        <div class="d-flex flex-column gap-1 align-items-end flex-shrink-0">
-          {% if atividade.dados_sensiveis %}
-            <span class="badge-sensivel">Dados Sensíveis</span>
-          {% endif %}
-          <span class="badge text-bg-light text-dark">
-            {{ {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or 'Em andamento') }}
-          </span>
-        </div>
-      </div>
+  <div class="col-lg-9">
 
-      <!-- Score -->
-      <div class="mt-3">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <span style="font-size:0.75rem;color:#888;font-weight:600;">Completude PPSI 2.0 / LGPD Art. 37</span>
-          <span style="font-size:0.85rem;font-weight:700;
-            color:{{ '#198754' if score >= 80 else ('#fd7e14' if score >= 50 else '#dc3545') }}">
-            {{ score }}%
-          </span>
+    <!-- Síntese executiva -->
+    <div class="card-ro p-3 mb-3">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <div>
+          <h5 style="color:var(--brand);font-weight:800;margin:0 0 .2rem;">{{ atividade.nome_atividade }}</h5>
+          <div style="font-size:.82rem;color:var(--muted);">{{ atividade.unidade_controladora or '' }} · v{{ atividade.versao or '1.0' }}</div>
         </div>
-        <div class="progress" style="height:8px;">
-          <div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div>
+        <div class="d-flex flex-column gap-1 align-items-end">
+          <div class="d-flex gap-1">
+            {% if atividade.dados_sensiveis %}<span class="badge-sensivel"><i class="bi bi-shield-exclamation"></i> Sensível</span>{% endif %}
+            <span class="badge {{ {'concluido':'text-bg-success','em_revisao':'text-bg-warning text-dark','descontinuado':'text-bg-secondary','cancelado':'text-bg-secondary','em_andamento':'text-bg-secondary'}.get(atividade.situacao,'text-bg-secondary') }}">
+              {{ {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or 'Em andamento') }}
+            </span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span style="font-size:.74rem;color:var(--muted);font-weight:600;">Completude PPSI 2.0</span>
+            <span style="font-size:1rem;font-weight:800;color:{{ '#198754' if score>=80 else ('#fd7e14' if score>=50 else '#dc3545') }}">{{ score }}%</span>
+          </div>
+          <div class="progress" style="width:180px;height:7px;"><div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div></div>
+          {% if faltando %}
+          <div style="font-size:.7rem;color:var(--danger);text-align:right;">Faltam: {% for d,_ in faltando %}<span class="badge text-bg-danger bg-opacity-10 text-danger me-1">{{ d }}</span>{% endfor %}</div>
+          {% else %}
+          <div style="font-size:.75rem;color:var(--success);"><i class="bi bi-check-circle-fill"></i> Registro completo</div>
+          {% endif %}
         </div>
-        {% if faltando %}
-        <div class="mt-2" style="font-size:0.75rem;color:#dc3545;">
-          Campos incompletos:
-          {% for desc, peso in faltando %}
-            <span class="badge text-bg-danger bg-opacity-10 text-danger me-1">{{ desc }} ({{ peso }}%)</span>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="mt-1" style="font-size:0.75rem;color:#198754;">
-          <i class="bi bi-check-circle-fill"></i> Registro completo
-        </div>
-        {% endif %}
       </div>
     </div>
 
     <!-- RIPD -->
-    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
+    <div class="card-ro p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center">
-        <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
-                   color:var(--tre-azul);font-weight:700;margin:0;">
-          <i class="bi bi-file-earmark-text me-1"></i> RIPD — Relatório de Impacto
-        </h6>
+        <h6 class="sec-tit" style="margin:0;"><i class="bi bi-file-earmark-text"></i> RIPD — Relatório de Impacto</h6>
         {% if ripd %}
           <span class="badge {{ {'aprovado':'text-bg-success','publicado':'text-bg-success','desatualizado':'text-bg-danger','rascunho':'text-bg-secondary','em_revisao':'text-bg-warning text-dark'}.get(ripd.situacao,'text-bg-secondary') }}">
             v{{ ripd.versao }} · {{ {'rascunho':'Rascunho','em_revisao':'Em revisão','aprovado':'Aprovado','publicado':'Publicado','desatualizado':'Desatualizado (revisar)'}.get(ripd.situacao, ripd.situacao) }}
           </span>
         {% endif %}
       </div>
-
       {% if risco.recomenda %}
-        <div class="mt-2" style="font-size:0.8rem;">
-          {% if not ripd %}
-            <span class="badge text-bg-warning text-dark">⚠ RIPD recomendado</span>
-            <span style="color:#555;"> — operação com indício de alto risco.</span>
-          {% elif ripd.situacao == 'desatualizado' %}
-            <span class="badge text-bg-danger">Revisão necessária</span>
-            <span style="color:#555;"> — a atividade mudou e o RIPD precisa ser revisto.</span>
-          {% endif %}
+        <div class="mt-2" style="font-size:.82rem;">
+          {% if not ripd %}<span class="badge text-bg-warning text-dark">⚠ RIPD recomendado</span> <span style="color:#555;">— operação com indício de alto risco.</span>
+          {% elif ripd.situacao == 'desatualizado' %}<span class="badge text-bg-danger">Revisão necessária</span> <span style="color:#555;">— a atividade mudou e o RIPD precisa ser revisto.</span>{% endif %}
           {% if risco.fatores %}
-          <div style="font-size:0.72rem;color:#888;margin-top:0.3rem;">
-            Fatores: {% for f in risco.fatores %}
-              <span class="badge text-bg-light text-dark">{{ CRITERIO_GERAL_LABELS.get(f) or CRITERIO_ESPECIFICO_LABELS.get(f) or f }}</span>
-            {% endfor %}
-          </div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;">Fatores: {% for f in risco.fatores %}<span class="badge badge-soft me-1">{{ CRITERIO_GERAL_LABELS.get(f) or CRITERIO_ESPECIFICO_LABELS.get(f) or f }}</span>{% endfor %}</div>
           {% endif %}
         </div>
         <div class="d-flex gap-2 mt-2">
-          {% if ripd %}
-            <a href="{{ url_for('ripd_ver', ripd_id=ripd.id) }}" class="btn btn-sm btn-tre">
-              <i class="bi bi-eye"></i> Ver RIPD
-            </a>
-          {% else %}
-            <form action="{{ url_for('ripd_novo', atividade_id=atividade.id) }}" method="post">
-              <button class="btn btn-sm btn-tre">
-                <i class="bi bi-plus-lg"></i> Gerar RIPD
-              </button>
-            </form>
-          {% endif %}
+          {% if ripd %}<a href="{{ url_for('ripd_ver', ripd_id=ripd.id) }}" class="btn btn-sm btn-tre"><i class="bi bi-eye"></i> Ver RIPD</a>
+          {% else %}<form action="{{ url_for('ripd_novo', atividade_id=atividade.id) }}" method="post"><button class="btn btn-sm btn-tre"><i class="bi bi-plus-lg"></i> Gerar RIPD</button></form>{% endif %}
         </div>
       {% else %}
-        <div class="mt-1" style="font-size:0.8rem;color:#198754;">
-          <i class="bi bi-check-circle-fill"></i> Sem indício de alto risco — RIPD não obrigatório pelo gatilho automático.
-        </div>
+        <div class="mt-1" style="font-size:.82rem;color:var(--success);"><i class="bi bi-check-circle-fill"></i> Sem indício de alto risco — RIPD não obrigatório pelo gatilho.</div>
       {% endif %}
     </div>
 
-    <!-- Detalhes -->
-    <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
-      <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
-                 color:var(--tre-azul);font-weight:700;margin-bottom:1rem;">
-        Detalhes do Tratamento <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#aaa;">(conteúdo mínimo — Guia PPSI 2.0)</span>
-      </h6>
+    {% macro row(label, value, crit=false, full=false) %}
+    <div class="detail-row {% if crit %}crit{% endif %} {% if full %}full{% endif %}">
+      <span class="detail-label">{{ label }}</span><span class="detail-value">{{ value if value else '—' }}</span>
+    </div>
+    {% endmacro %}
 
-      {% macro row(label, value) %}
-      <div class="detail-row">
-        <span class="detail-label">{{ label }}</span>
-        <span class="detail-value">{{ value if value else '—' }}</span>
+    <!-- 4.1 Identificação -->
+    <div class="card-ro p-3 mb-3" id="sec-41">
+      <h6 class="sec-tit"><i class="bi bi-tag"></i> 4.1 Identificação</h6>
+      <div class="detail-grid">
+        {{ row("Unidade administrativa", atividade.unidade_controladora) }}
+        {{ row("Situação", {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or '—')) }}
+        {{ row("Responsável pelo preenchimento", atividade.responsavel_preenchimento) }}
+        {{ row("Versão", atividade.versao or '1.0') }}
+        {{ row("Processo SEI", atividade.sistema_sei) }}
+        {{ row("Criado em", atividade.criado_em) }}
       </div>
-      {% endmacro %}
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.1 Identificação</h6>
-      {{ row("Responsável pelo preenchimento", atividade.responsavel_preenchimento) }}
-      {{ row("Situação do registro", {'em_andamento':'Em andamento','em_revisao':'Em revisão','concluido':'Concluído','descontinuado':'Descontinuado','cancelado':'Cancelado'}.get(atividade.situacao, atividade.situacao or '—')) }}
-      {{ row("Versão", atividade.versao or '1.0') }}
-      {{ row("Unidade administrativa", atividade.unidade_controladora) }}
-      {{ row("Processo SEI", atividade.sistema_sei) }}
-
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.4 Finalidade e fundamentação</h6>
-      {{ row("Finalidade", atividade.finalidade) }}
-      <div class="detail-row">
-        <span class="detail-label">Base Legal</span>
-        <span class="detail-value">
-          {% if atividade.base_legal %}
-            <span class="badge text-bg-light text-dark me-1">{{ atividade.base_legal }}</span>
-            {{ base_desc }}
-          {% else %}—{% endif %}
-        </span>
+    <!-- 4.4 Finalidade -->
+    <div class="card-ro p-3 mb-3" id="sec-44">
+      <h6 class="sec-tit"><i class="bi bi-bullseye"></i> 4.4 Finalidade e fundamentação</h6>
+      <div class="detail-grid">
+        {{ row("Finalidade", atividade.finalidade, crit=true, full=true) }}
+        <div class="detail-row crit full"><span class="detail-label">Base Legal</span><span class="detail-value">{% if atividade.base_legal %}<span class="badge badge-soft me-1">{{ atividade.base_legal }}</span> {{ base_desc }}{% else %}—{% endif %}</span></div>
+        {{ row("Previsão normativa", atividade.previsao_normativa, full=true) }}
       </div>
-      {{ row("Previsão normativa", atividade.previsao_normativa) }}
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.2 Dados pessoais tratados</h6>
-      {{ row("Categorias de titulares", atividade.categorias_titulares) }}
-      {{ row("Estimativa de titulares", dict_estimativa_para_texto(atividade.titulares_estimativa)) }}
-      {{ row("Titulares c/ proteção reforçada", lista_para_texto(atividade.titulares_protecao_reforcada)) }}
-      {{ row("Tipos de dados", atividade.categorias_dados) }}
-      {{ row("Tipos de dados por categoria (FCI)", dict_tipos_para_texto(atividade.tipos_dados)) }}
-      <div class="detail-row">
-        <span class="detail-label">Dados Sensíveis</span>
-        <span class="detail-value">
-          {% if atividade.dados_sensiveis %}
-            <span class="badge-sensivel">Sim — Art. 5º, II LGPD</span>
-          {% else %}Não{% endif %}
-        </span>
+    <!-- 4.2 Dados -->
+    <div class="card-ro p-3 mb-3" id="sec-42">
+      <h6 class="sec-tit"><i class="bi bi-person-vcard"></i> 4.2 Dados pessoais tratados</h6>
+      <div class="detail-grid">
+        {{ row("Categorias de titulares", atividade.categorias_titulares) }}
+        {{ row("Proteção reforçada", lista_para_texto(atividade.titulares_protecao_reforcada)) }}
+        {{ row("Estimativa de titulares", dict_estimativa_para_texto(atividade.titulares_estimativa), full=true) }}
+        {{ row("Tipos de dados", atividade.categorias_dados, full=true) }}
+        {{ row("Tipos por categoria (FCI)", dict_tipos_para_texto(atividade.tipos_dados), full=true) }}
+        <div class="detail-row crit {% if atividade.dados_sensiveis %}full{% endif %}"><span class="detail-label">Dados sensíveis</span><span class="detail-value">{% if atividade.dados_sensiveis %}<span class="badge-sensivel">Sim — Art. 5º, II</span>{% else %}Não{% endif %}</span></div>
+        {{ row("Tipos de dados sensíveis", lista_para_texto(atividade.tipos_dados_sensiveis)) }}
       </div>
-      {{ row("Tipos de dados sensíveis", lista_para_texto(atividade.tipos_dados_sensiveis)) }}
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.3 Ciclo de vida dos dados</h6>
-      {{ row("Fluxo de tratamento", atividade.fluxo_tratamento) }}
-      {{ row("Origem dos dados", lista_para_texto(atividade.origem_dados)) }}
-      {{ row("Local e meio de armazenamento", atividade.local_armazenamento) }}
-      {{ row("Prazo de retenção", atividade.prazo_retencao) }}
-      {{ row("Eliminação/destinação final", atividade.eliminacao_destinacao) }}
-      {{ row("Frequência do tratamento", atividade.frequencia_tratamento) }}
+    <!-- 4.3 Ciclo de vida -->
+    <div class="card-ro p-3 mb-3" id="sec-43">
+      <h6 class="sec-tit"><i class="bi bi-arrow-repeat"></i> 4.3 Ciclo de vida dos dados</h6>
+      <div class="detail-grid">
+        {{ row("Fluxo de tratamento", atividade.fluxo_tratamento, full=true) }}
+        {{ row("Origem dos dados", lista_para_texto(atividade.origem_dados), full=true) }}
+        {{ row("Local e meio de armazenamento", atividade.local_armazenamento, full=true) }}
+        {{ row("Prazo de retenção", atividade.prazo_retencao) }}
+        {{ row("Frequência", atividade.frequencia_tratamento) }}
+        {{ row("Eliminação/destinação final", atividade.eliminacao_destinacao, full=true) }}
+      </div>
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.5 Agentes de tratamento</h6>
-      {{ row("Controladores", lista_para_texto(atividade.controladores)) }}
-      {{ row("Operadores", lista_para_texto(atividade.operadores)) }}
+    <!-- 4.5 Agentes -->
+    <div class="card-ro p-3 mb-3" id="sec-45">
+      <h6 class="sec-tit"><i class="bi bi-people"></i> 4.5 Agentes de tratamento</h6>
+      <div class="detail-grid">
+        {{ row("Controladores", lista_para_texto(atividade.controladores), full=true) }}
+        {{ row("Operadores", lista_para_texto(atividade.operadores), full=true) }}
+      </div>
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">4.6 Compartilhamento e transferência</h6>
-      {{ row("Compartilhamento", atividade.destinatarios) }}
-      {{ row("Compartilhamentos detalhados", lista_para_texto(atividade.compartilhamentos)) }}
-      {{ row("Transferência internacional", atividade.transferencia_inter) }}
-      {{ row("Transferência internacional detalhada", lista_para_texto(atividade.transferencia_internacional)) }}
+    <!-- 4.6 Compartilhamento -->
+    <div class="card-ro p-3 mb-3" id="sec-46">
+      <h6 class="sec-tit"><i class="bi bi-share"></i> 4.6 Compartilhamento e transferência</h6>
+      <div class="detail-grid">
+        {{ row("Compartilhamento", atividade.destinatarios, full=true) }}
+        {{ row("Compartilhamentos detalhados", lista_para_texto(atividade.compartilhamentos), full=true) }}
+        {{ row("Transferência internacional", atividade.transferencia_inter) }}
+        {{ row("Transf. int. detalhada", lista_para_texto(atividade.transferencia_internacional), full=true) }}
+      </div>
+    </div>
 
-      <h6 style="font-size:0.68rem;color:var(--tre-azul);font-weight:700;margin:.6rem 0 .2rem;">Segurança (Art. 46)</h6>
-      {{ row("Medidas de segurança", atividade.medidas_seguranca) }}
-      {{ row("Observações", atividade.observacoes) }}
-      {{ row("Criado em", atividade.criado_em) }}
-      {{ row("Atualizado em", atividade.atualizado_em) }}
+    <!-- Segurança -->
+    <div class="card-ro p-3 mb-3" id="sec-seg">
+      <h6 class="sec-tit"><i class="bi bi-lock"></i> Segurança (Art. 46)</h6>
+      <div class="detail-grid">
+        {{ row("Medidas de segurança", atividade.medidas_seguranca, full=true) }}
+        {{ row("Observações", atividade.observacoes, full=true) }}
+        {{ row("Atualizado em", atividade.atualizado_em) }}
+      </div>
     </div>
   </div>
 
   <!-- Coluna lateral -->
-  <div class="col-lg-4">
-    <!-- Versões -->
-    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
-      <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
-                 color:var(--tre-azul);font-weight:700;margin-bottom:0.75rem;">
-        <i class="bi bi-arrow-counterclockwise me-1"></i> Versões do Registro
-      </h6>
+  <div class="col-lg-3">
+    <div class="card-ro p-3 mb-3 detail-anchors">
+      <h6 style="font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--brand);font-weight:800;margin-bottom:.5rem;">Ir para</h6>
+      <a href="#sec-41" class="active">4.1 Identificação</a>
+      <a href="#sec-44">4.4 Finalidade</a>
+      <a href="#sec-42">4.2 Dados pessoais</a>
+      <a href="#sec-43">4.3 Ciclo de vida</a>
+      <a href="#sec-45">4.5 Agentes</a>
+      <a href="#sec-46">4.6 Compartilhamento</a>
+      <a href="#sec-seg">Segurança</a>
+    </div>
+
+    <div class="card-ro p-3 mb-3">
+      <h6 style="font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--brand);font-weight:800;margin-bottom:.6rem;"><i class="bi bi-arrow-counterclockwise"></i> Versões do Registro</h6>
       {% if versoes %}
         {% for v in versoes %}
-        <div style="font-size:0.75rem;border-bottom:1px solid #f0f0f0;padding:0.45rem 0;">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="badge text-bg-light text-dark">v{{ v.versao }}</span>
-            <span style="color:#aaa;font-size:0.68rem;">{{ v.criado_em[:16] }}</span>
-          </div>
-          <div style="color:#555;margin-top:0.2rem;">{{ v.sintese or '—' }}</div>
-          <div style="color:#aaa;font-size:0.68rem;">{{ v.responsavel or '' }}</div>
+        <div style="font-size:.75rem;border-bottom:1px solid #eef1f8;padding:.4rem 0;">
+          <div class="d-flex justify-content-between"><span class="badge badge-soft">v{{ v.versao }}</span><span style="color:var(--muted);font-size:.68rem;">{{ v.criado_em[:16] }}</span></div>
+          <div style="color:#444;margin-top:.15rem;">{{ v.sintese or '—' }}</div>
           {% if v.versao != (atividade.versao or '1.0') %}
-          <form action="{{ url_for('restaurar', atividade_id=atividade.id, versao_id=v.id) }}"
-                method="post" class="mt-1"
-                onsubmit="return confirm('Restaurar o registro à v{{ v.versao }}? Uma nova versão será criada.');">
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.7rem;">
-              <i class="bi bi-arrow-counterclockwise"></i> Restaurar v{{ v.versao }}
-            </button>
+          <form action="{{ url_for('restaurar', atividade_id=atividade.id, versao_id=v.id) }}" method="post" class="mt-1" onsubmit="return confirm('Restaurar o registro à v{{ v.versao }}?');">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.68rem;"><i class="bi bi-arrow-counterclockwise"></i> Restaurar v{{ v.versao }}</button>
           </form>
           {% endif %}
         </div>
         {% endfor %}
-      {% else %}
-        <p style="font-size:0.78rem;color:#aaa;margin:0;">Nenhuma versão registrada.</p>
-      {% endif %}
+      {% else %}<p style="font-size:.78rem;color:var(--muted);margin:0;">Nenhuma versão.</p>{% endif %}
     </div>
 
-    <!-- Histórico de alterações -->
-    <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
-      <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
-                 color:var(--tre-azul);font-weight:700;margin-bottom:0.75rem;">
-        <i class="bi bi-clock-history me-1"></i> Histórico de Alterações
-      </h6>
+    <div class="card-ro p-3">
+      <h6 style="font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--brand);font-weight:800;margin-bottom:.6rem;"><i class="bi bi-clock-history"></i> Histórico de Alterações</h6>
       {% if historico %}
         {% for h in historico %}
-        <div style="font-size:0.75rem;border-bottom:1px solid #f0f0f0;padding:0.4rem 0;">
-          <div style="color:#888;">{{ h.alterado_em[:16] }}</div>
+        <div style="font-size:.72rem;border-bottom:1px solid #eef1f8;padding:.35rem 0;">
+          <div style="color:var(--muted);">{{ h.alterado_em[:16] }}</div>
           <div style="font-weight:600;color:#444;">{{ h.campo }}</div>
-          <div style="color:#aaa;font-size:0.7rem;">
-            {{ (h.valor_antigo or '—')[:40] }} → {{ (h.valor_novo or '—')[:40] }}
-          </div>
+          <div style="color:#aaa;font-size:.66rem;">{{ (h.valor_antigo or '—')[:36] }} → {{ (h.valor_novo or '—')[:36] }}</div>
         </div>
         {% endfor %}
-      {% else %}
-        <p style="font-size:0.78rem;color:#aaa;margin:0;">Nenhuma alteração registrada.</p>
-      {% endif %}
+      {% else %}<p style="font-size:.78rem;color:var(--muted);margin:0;">Nenhuma alteração.</p>{% endif %}
     </div>
   </div>
 </div>
+
+<script>
+  // active anchor on scroll
+  const links = document.querySelectorAll('.detail-anchors a');
+  const secs = [...links].map(l => document.querySelector(l.getAttribute('href'))).filter(Boolean);
+  window.addEventListener('scroll', () => {
+    let cur = secs[0];
+    for (const s of secs) if (window.scrollY >= s.offsetTop - 90) cur = s;
+    links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + cur.id));
+  }, { passive: true });
+</script>
 {% endblock %}

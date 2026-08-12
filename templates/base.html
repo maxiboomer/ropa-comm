@@ -4,27 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}RoPA{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" />
   <style>
     :root {
-      --tre-azul: #1F3D7A;
-      --tre-azul-hover: #162d5b;
-      --tre-leve: #EEF2FF;
-      --tre-borda: #d0d9f0;
+      --brand: #1F3D7A;
+      --brand-2: #2B57A6;
+      --brand-ink: #162d5b;
+      --accent: #E9A11B;
+      --danger: #dc3545;
+      --success: #1d7a4f;
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface-2: #eef1f8;
+      --border: #dde3f0;
+      --text: #1f2430;
+      --muted: #6b7280;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.06);
+      --shadow-lg: 0 8px 30px rgba(16,24,40,.12);
     }
 
+    * { box-sizing: border-box; }
     body {
-      background: #f5f7fb;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: 0.9rem;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── Sidebar ── */
     #sidebar {
-      width: 240px;
+      width: 244px;
       min-height: 100vh;
-      background: var(--tre-azul);
+      background: linear-gradient(180deg, #17294f 0%, #101d3a 100%);
       color: #fff;
       position: fixed;
       top: 0; left: 0;
@@ -33,173 +48,165 @@
       z-index: 100;
     }
     #sidebar .brand {
-      padding: 1.2rem 1rem 0.8rem;
-      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding: 1.3rem 1.1rem 0.9rem;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    #sidebar .brand .logo {
+      display:flex; align-items:center; gap:.55rem; margin-bottom:.3rem;
+    }
+    #sidebar .brand .logo .mark {
+      width:32px; height:32px; border-radius:9px;
+      background: linear-gradient(135deg,var(--accent),#f5b93f);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; color:#101d3a; font-size:.95rem; flex-shrink:0;
     }
     #sidebar .brand h6 {
-      font-size: 0.7rem;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      opacity: 0.6;
-      margin-bottom: 0.2rem;
+      font-size: .72rem; letter-spacing: .09em; text-transform: uppercase;
+      opacity:.65; margin:0; font-weight:700;
     }
-    #sidebar .brand p {
-      font-size: 0.78rem;
-      opacity: 0.8;
-      margin: 0;
+    #sidebar .brand p { font-size:.78rem; opacity:.75; margin:0; font-weight:600; }
+    #sidebar nav { padding: .6rem 0; flex: 1; overflow-y:auto; }
+    #sidebar .nav-label {
+      font-size:.62rem; letter-spacing:.12em; text-transform:uppercase;
+      color:rgba(255,255,255,.4); padding:.7rem 1.2rem .35rem; font-weight:700;
     }
-    #sidebar nav { padding: 0.5rem 0; flex: 1; }
-    #sidebar nav a {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.6rem 1.1rem;
-      color: rgba(255,255,255,0.82);
-      text-decoration: none;
-      font-size: 0.85rem;
-      transition: background 0.15s;
+    #sidebar nav a.nav-link {
+      display:flex; align-items:center; gap:.6rem;
+      padding:.55rem 1.15rem; color:rgba(255,255,255,.78);
+      text-decoration:none; font-size:.85rem; font-weight:500;
+      transition:background .15s,color .15s; border-left:3px solid transparent;
     }
-    #sidebar nav a:hover,
-    #sidebar nav a.active {
-      background: rgba(255,255,255,0.12);
-      color: #fff;
+    #sidebar nav a.nav-link:hover { background:rgba(255,255,255,.07); color:#fff; }
+    #sidebar nav a.nav-link.active {
+      background:rgba(255,255,255,.10); color:#fff;
+      border-left-color:var(--accent); font-weight:600;
     }
-    #sidebar nav a i { font-size: 1rem; width: 1.2rem; }
+    #sidebar nav a.nav-link i { font-size:1.02rem; width:1.2rem; text-align:center; }
+    #sidebar .export-wrap { }
+    #sidebar .export-wrap .export-toggle { cursor:pointer; }
+    #sidebar .export-wrap .export-list { padding:.15rem 0 .35rem; }
+    #sidebar .export-wrap .export-list a {
+      display:flex; align-items:center; gap:.6rem;
+      padding:.4rem 1.15rem .4rem 2.7rem; color:rgba(255,255,255,.6);
+      text-decoration:none; font-size:.78rem; transition:color .15s, background .15s;
+    }
+    #sidebar .export-wrap .export-list a:hover { color:#fff; background:rgba(255,255,255,.05); }
+    #sidebar .export-wrap .export-list a i { font-size:.9rem; width:1.05rem; }
+    #sidebar .sidebar-user {
+      padding:.8rem 1.1rem; border-top:1px solid rgba(255,255,255,.08);
+    }
     #sidebar .sidebar-footer {
-      padding: 0.8rem 1rem;
-      font-size: 0.7rem;
-      opacity: 0.5;
-      border-top: 1px solid rgba(255,255,255,0.1);
+      padding:.8rem 1.1rem; font-size:.68rem; opacity:.5;
+      border-top:1px solid rgba(255,255,255,.06); line-height:1.5;
     }
 
     /* ── Main ── */
-    #main {
-      margin-left: 240px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    #main { margin-left:244px; min-height:100vh; display:flex; flex-direction:column; }
     #topbar {
-      background: #fff;
-      border-bottom: 1px solid var(--tre-borda);
-      padding: 0.75rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 50;
+      background:rgba(255,255,255,.85); backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--border);
+      padding:.7rem 1.5rem; display:flex; align-items:center;
+      justify-content:space-between; position:sticky; top:0; z-index:50;
     }
-    #topbar h1 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--tre-azul);
-      margin: 0;
-    }
-    #content { padding: 1.5rem; flex: 1; }
+    #topbar h1 { font-size:1.05rem; font-weight:700; color:var(--text); margin:0; }
+    #content { padding:1.5rem; flex:1; max-width:1280px; width:100%; margin:0 auto; }
 
     /* ── Cards ── */
-    .stat-card {
-      background: #fff;
-      border: 1px solid var(--tre-borda);
-      border-radius: 0.5rem;
-      padding: 1.25rem 1.5rem;
-    }
-    .stat-card .stat-value {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1;
-      color: var(--tre-azul);
-    }
-    .stat-card .stat-label {
-      font-size: 0.75rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-top: 0.3rem;
-    }
-    .stat-card i { font-size: 1.4rem; }
+    .card-ro { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.15rem 1.4rem; transition:transform .15s, box-shadow .15s; position:relative; overflow:hidden; }
+    .stat-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+    .stat-card .stat-icon { position:absolute; right:.9rem; top:.9rem; font-size:1.5rem; opacity:.18; }
+    .stat-card .stat-value { font-size:1.9rem; font-weight:800; line-height:1; color:var(--text); }
+    .stat-card .stat-label { font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; margin-top:.35rem; }
+    .stat-card .stat-sub { font-size:.72rem; color:var(--muted); margin-top:.2rem; }
+
+    /* ── Alertas de ação ── */
+    .alert-card { background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--brand); border-radius:var(--radius-sm); box-shadow:var(--shadow); padding:.8rem 1rem; display:flex; align-items:center; gap:.8rem; transition:transform .12s, box-shadow .12s; }
+    .alert-card:hover { transform:translateY(-1px); box-shadow:var(--shadow-lg); }
+    .alert-card.warn { border-left-color:var(--accent); }
+    .alert-card.danger { border-left-color:var(--danger); }
+    .alert-card .ic { font-size:1.3rem; width:2rem; text-align:center; }
+    .alert-card .ic.warn { color:var(--accent); } .alert-card .ic.danger { color:var(--danger); }
+    .alert-card .at-body { flex:1; } .alert-card .at-body .at-t { font-size:.85rem; font-weight:700; }
+    .alert-card .at-body .at-s { font-size:.75rem; color:var(--muted); }
 
     /* ── Tables ── */
     .table thead th {
-      background: var(--tre-azul);
-      color: #fff;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      border: none;
+      background:var(--surface-2); color:var(--text);
+      font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+      border:none; padding:.7rem .9rem; white-space:nowrap;
     }
-    .table td { vertical-align: middle; font-size: 0.82rem; }
-    .table-hover tbody tr:hover { background: var(--tre-leve); }
-
-    /* ── Progress bars ── */
-    .progress { height: 6px; border-radius: 99px; background: #e9ecef; }
+    .table td { vertical-align:middle; font-size:.82rem; padding:.65rem .9rem; }
+    .table-hover tbody tr { transition:background .1s; }
+    .table-hover tbody tr:hover { background:#f2f5fd; }
+    .table tbody tr { border-bottom:1px solid #eef1f8; }
 
     /* ── Badges ── */
-    .badge-sensivel {
-      background: #fee2e2;
-      color: #991b1b;
-      font-size: 0.7rem;
-      padding: 0.2em 0.55em;
-      border-radius: 4px;
-      font-weight: 600;
-    }
+    .badge-sensivel { background:#fee2e2; color:#991b1b; font-size:.7rem; padding:.25em .6em; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:.25rem; }
+    .badge-soft { background:var(--surface-2); color:var(--brand-2); font-weight:600; }
 
-    /* ── Score bar ── */
-    .score-block { display: flex; align-items: center; gap: 0.5rem; }
-    .score-block .progress { flex: 1; }
+    /* ── Botões ── */
+    .btn { border-radius:8px; }
+    .btn-tre { background:var(--brand); color:#fff; border:none; font-weight:600; }
+    .btn-tre:hover { background:var(--brand-ink); color:#fff; }
+    .btn-tre-soft { background:#e8edf9; color:var(--brand); border:none; font-weight:600; }
+    .btn-tre-soft:hover { background:#dbe3f5; color:var(--brand-ink); }
 
-    /* ── Form card ── */
-    .form-card {
-      background: #fff;
-      border: 1px solid var(--tre-borda);
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      margin-bottom: 1.25rem;
-    }
-    .form-card h6 {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--tre-azul);
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid var(--tre-leve);
-    }
-    .form-label { font-size: 0.8rem; font-weight: 600; color: #444; }
-    .form-label .req { color: #dc3545; }
+    /* ── Formulário ── */
+    .form-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.4rem 1.5rem; margin-bottom:1.1rem; }
+    .form-card h6 { font-size:.75rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--brand); margin-bottom:1rem; padding-bottom:.5rem; border-bottom:2px solid var(--surface-2); display:flex; align-items:center; gap:.45rem; }
+    .form-label { font-size:.8rem; font-weight:600; color:#374151; }
+    .form-label .req { color:var(--danger); }
+    .form-control, .form-select { border-radius:8px; border-color:#d6ddea; }
+    .form-control:focus, .form-select:focus { border-color:var(--brand-2); box-shadow:0 0 0 .18rem rgba(43,87,166,.12); }
+    .form-text { font-size:.72rem; color:var(--muted); }
 
-    /* ── Detail view ── */
-    .detail-row {
-      display: grid;
-      grid-template-columns: 180px 1fr;
-      gap: 0.25rem 1rem;
-      padding: 0.55rem 0;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 0.82rem;
-    }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { color: #888; font-weight: 600; font-size: 0.75rem; }
-    .detail-value { color: #222; }
+    /* Wizard stepper */
+    .stepper { display:flex; gap:.35rem; margin-bottom:1.25rem; overflow-x:auto; padding-bottom:.3rem; }
+    .stepper .step { flex:1; min-width:96px; text-align:center; cursor:pointer; }
+    .stepper .step .dot { width:26px; height:26px; margin:0 auto .3rem; border-radius:50%; background:var(--surface-2); color:var(--muted); font-size:.72rem; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid var(--border); transition:all .2s; }
+    .stepper .step.active .dot { background:var(--brand); color:#fff; border-color:var(--brand); }
+    .stepper .step.done .dot { background:var(--success); color:#fff; border-color:var(--success); }
+    .stepper .step .lbl { font-size:.66rem; color:var(--muted); font-weight:600; line-height:1.15; }
+    .stepper .step.active .lbl { color:var(--brand); }
 
-    /* ── Alerts ── */
-    .alert { font-size: 0.85rem; }
+    /* Tag input (chips) */
+    .tag-input { border:1px solid #d6ddea; border-radius:8px; padding:.35rem .5rem; display:flex; flex-wrap:wrap; gap:.35rem; background:#fff; cursor:text; min-height:40px; }
+    .tag-input .chip { background:#e8edf9; color:var(--brand-ink); border-radius:6px; padding:.15rem .5rem; font-size:.75rem; font-weight:600; display:inline-flex; align-items:center; gap:.3rem; }
+    .tag-input .chip .x { cursor:pointer; color:var(--muted); font-weight:700; }
+    .tag-input .chip .x:hover { color:var(--danger); }
+    .tag-input input { border:none; outline:none; flex:1; min-width:120px; font-size:.82rem; background:transparent; }
+    .hidden-tags { display:none; }
 
-    /* ── Mobile ── */
+    /* Detail view */
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem 1.25rem; }
+    .detail-row { display:grid; grid-template-columns:minmax(150px,210px) 1fr; gap:.1rem 1rem; padding:.5rem 0; border-bottom:1px solid #eef1f8; font-size:.82rem; }
+    .detail-row:last-child { border-bottom:none; }
+    .detail-label { color:var(--muted); font-weight:600; font-size:.74rem; }
+    .detail-value { color:var(--text); }
+    .detail-row.full { grid-column:1/-1; }
+    .detail-row.crit .detail-label { color:var(--brand); font-weight:700; }
+    .sec-tit{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);font-weight:800;margin:1rem 0 .2rem;padding-bottom:.3rem;border-bottom:1px solid var(--surface-2);}
+
+    /* Sticky detail nav */
+    .detail-anchors { position:sticky; top:70px; }
+    .detail-anchors a { display:block; padding:.4rem .7rem; font-size:.78rem; color:var(--muted); text-decoration:none; border-radius:7px; border-left:3px solid transparent; }
+    .detail-anchors a:hover { background:var(--surface-2); color:var(--brand); }
+    .detail-anchors a.active { color:var(--brand); border-left-color:var(--accent); font-weight:700; }
+
+    /* Score */
+    .score-block { display:flex; align-items:center; gap:.5rem; }
+    .progress { height:6px; border-radius:99px; background:#e9edf5; }
+    .progress-bar { border-radius:99px; }
+
+    .empty-state { text-align:center; padding:3rem 1rem; color:var(--muted); }
+    .empty-state i { font-size:2.6rem; opacity:.3; }
+    .empty-state p { margin:.6rem 0 1rem; }
+
     @media (max-width: 768px) {
-      #sidebar { display: none; }
-      #main { margin-left: 0; }
-    }
-
-    .btn-tre {
-      background: var(--tre-azul);
-      color: #fff;
-      border: none;
-    }
-    .btn-tre:hover {
-      background: var(--tre-azul-hover);
-      color: #fff;
+      #sidebar { display:none; }
+      #main { margin-left:0; }
+      .detail-grid { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -208,67 +215,52 @@
 <!-- Sidebar -->
 <div id="sidebar">
   <div class="brand">
-    <h6>LGPD</h6>
-    <strong style="font-size:0.95rem;">RoPA</strong>
-    <p>Reg. de Atividades de Tratamento</p>
-  </div>
-  <nav>
-    <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
-      <i class="bi bi-speedometer2"></i> Dashboard
-    </a>
-    <a href="{{ url_for('listar') }}" class="{% if request.endpoint in ('listar','ver') %}active{% endif %}">
-      <i class="bi bi-list-ul"></i> Atividades
-    </a>
-    <a href="{{ url_for('nova') }}" class="{% if request.endpoint == 'nova' %}active{% endif %}">
-      <i class="bi bi-plus-circle"></i> Nova Atividade
-    </a>
-    <a href="{{ url_for('validar') }}" class="{% if request.endpoint == 'validar' %}active{% endif %}">
-      <i class="bi bi-patch-check"></i> Validar Completude
-    </a>
-    <hr style="border-color:rgba(255,255,255,0.1);margin:0.4rem 1rem;">
-    <a href="{{ url_for('importar') }}" class="{% if request.endpoint == 'importar' %}active{% endif %}">
-      <i class="bi bi-cloud-upload"></i> Importar PIA
-    </a>
-    <a href="{{ url_for('exportar', formato='xlsx') }}">
-      <i class="bi bi-file-earmark-excel"></i> Exportar XLSX
-    </a>
-    <a href="{{ url_for('exportar', formato='csv') }}">
-      <i class="bi bi-filetype-csv"></i> Exportar CSV
-    </a>
-    <a href="{{ url_for('exportar', formato='json') }}">
-      <i class="bi bi-filetype-json"></i> Exportar JSON
-    </a>
-    <a href="{{ url_for('exportar', formato='pdf') }}">
-      <i class="bi bi-file-earmark-pdf"></i> Relatório PDF
-    </a>
-  </nav>
-  <!-- Usuário logado -->
-  {% if session.get('user') %}
-  <div style="padding:0.7rem 1rem;border-top:1px solid rgba(255,255,255,0.1);">
-    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
-      <div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.15);
-                  display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <i class="bi bi-person-fill" style="font-size:0.85rem;"></i>
-      </div>
-      <div style="overflow:hidden;">
-        <div style="font-size:0.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          {{ session.user.name }}
-        </div>
-        <div style="font-size:0.65rem;opacity:0.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          {{ session.user.email or session.user.username }}
-        </div>
+    <div class="logo">
+      <div class="mark">R</div>
+      <div>
+        <h6>LGPD · PPSI 2.0</h6>
+        <p>RoPA</p>
       </div>
     </div>
-    <a href="{{ url_for('logout') }}"
-       style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:rgba(255,255,255,0.6);
-              text-decoration:none;padding:0.3rem 0;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">
-      <i class="bi bi-box-arrow-left"></i> Sair
-    </a>
+  </div>
+  <nav>
+    <div class="nav-label">Navegação</div>
+    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-link {% if request.endpoint in ('listar','ver','nova','editar') %}active{% endif %}" href="{{ url_for('listar') }}"><i class="bi bi-list-ul"></i> Atividades</a>
+    <a class="nav-link {% if request.endpoint == 'validar' %}active{% endif %}" href="{{ url_for('validar') }}"><i class="bi bi-patch-check"></i> Validar Completude</a>
+    <a class="nav-link {% if request.endpoint == 'importar' %}active{% endif %}" href="{{ url_for('importar') }}"><i class="bi bi-cloud-upload"></i> Importar PIA</a>
+
+    <div class="nav-label">Saída</div>
+    <div class="export-wrap">
+      <a class="nav-link export-toggle" data-bs-toggle="collapse" href="#exportMenu" role="button">
+        <i class="bi bi-box-arrow-up"></i> Exportar <i class="bi bi-chevron-down ms-auto" style="font-size:.7rem;"></i>
+      </a>
+      <div class="collapse export-list" id="exportMenu">
+        <a href="{{ url_for('exportar', formato='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Planilha (XLSX)</a>
+        <a href="{{ url_for('exportar', formato='csv') }}"><i class="bi bi-filetype-csv"></i> CSV</a>
+        <a href="{{ url_for('exportar', formato='json') }}"><i class="bi bi-filetype-json"></i> JSON</a>
+        <a href="{{ url_for('exportar', formato='pdf') }}"><i class="bi bi-file-earmark-pdf"></i> Relatório PDF</a>
+      </div>
+    </div>
+  </nav>
+
+  {% if session.get('user') %}
+  <div class="sidebar-user">
+    <div style="display:flex;align-items:center;gap:.55rem;">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="bi bi-person-fill"></i>
+      </div>
+      <div style="overflow:hidden;min-width:0;">
+        <div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ session.user.name }}</div>
+        <div style="font-size:.64rem;opacity:.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ session.user.email or session.user.username }}</div>
+      </div>
+      <a href="{{ url_for('logout') }}" title="Sair" style="margin-left:auto;color:rgba(255,255,255,.6);text-decoration:none;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.6)'">
+        <i class="bi bi-box-arrow-left"></i>
+      </a>
+    </div>
   </div>
   {% endif %}
-  <div class="sidebar-footer">
-    LGPD · Lei 13.709/2018<br>Art. 37 — Registro obrigatório
-  </div>
+  <div class="sidebar-footer">LGPD · Lei 13.709/2018<br>PPSI 2.0 · controle 19 e 23</div>
 </div>
 
 <!-- Main -->
@@ -277,13 +269,15 @@
     <h1>{% block page_title %}RoPA{% endblock %}</h1>
     <div class="d-flex align-items-center gap-2">
       {% if session.get('user') %}
-      <span style="font-size:0.75rem;color:#888;margin-right:0.25rem;">
+      <span style="font-size:.75rem;color:var(--muted);margin-right:.25rem;">
         <i class="bi bi-person-circle"></i> {{ session.user.name }}
       </span>
       {% endif %}
+      {% if request.endpoint != 'nova' %}
       <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm">
         <i class="bi bi-plus"></i> Nova Atividade
       </a>
+      {% endif %}
     </div>
   </div>
 
@@ -301,7 +295,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
