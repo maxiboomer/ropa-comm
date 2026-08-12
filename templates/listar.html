@@ -24,6 +24,7 @@
           <th>Base Legal</th>
           <th>Situação</th>
           <th style="width:90px">Sensível</th>
+          <th style="width:110px">RIPD</th>
           <th style="width:140px">Completude</th>
           <th style="width:110px">Atualizado</th>
           <th style="width:100px"></th>
@@ -63,6 +64,21 @@
               <span class="badge-sensivel">Sim</span>
             {% else %}
               <span class="text-muted" style="font-size:0.8rem;">Não</span>
+            {% endif %}
+          </td>
+          <td style="font-size:0.72rem;">
+            {% set _risco = calcular_risco(r) %}
+            {% set _st = ripd_status.get(r.id) %}
+            {% if _st %}
+              <span class="badge {{ {'aprovado':'text-bg-success','publicado':'text-bg-success','desatualizado':'text-bg-danger','rascunho':'text-bg-secondary','em_revisao':'text-bg-warning text-dark'}.get(_st.situacao,'text-bg-secondary') }}">
+                v{{ _st.versao }} {{ {'rascunho':'Rascunho','em_revisao':'Em revisão','aprovado':'Aprovado','publicado':'Publicado','desatualizado':'Revisar'}.get(_st.situacao,_st.situacao) }}
+              </span>
+            {% elif _risco.recomenda %}
+              <a href="{{ url_for('ver', atividade_id=r.id) }}" class="text-decoration-none">
+                <span class="badge text-bg-warning text-dark">⚠ Recomendado</span>
+              </a>
+            {% else %}
+              <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>

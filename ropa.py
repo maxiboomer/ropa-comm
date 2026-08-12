@@ -246,6 +246,11 @@ def _coletar_campos(atual: dict = None) -> dict:
     else:
         tipos_sens  = ""
 
+    print(f"\n{NEGRITO}  ── Critérios de alto risco (gatilho RIPD – Res. ANPD 2/2022) ──{RESET}")
+    tec_emerg   = sim_nao("Usa tecnologias emergentes/ inovadoras?", padrao=bool(a.get("tecnologias_emergentes",0)))
+    dec_auto    = sim_nao("Decisões unicamente automatizadas (perfilamento)?", padrao=bool(a.get("decisoes_automatizadas",0)))
+    vig_pub     = sim_nao("Vigilância/controle de zonas acessíveis ao público?", padrao=bool(a.get("vigilancia_zonas_publicas",0)))
+
     print(f"\n{NEGRITO}  ── Ciclo de vida dos dados (Guia 4.3) ─────────────────────{RESET}")
     fluxo        = perguntar("fluxo_tratamento","Descrição do fluxo de tratamento (coleta → uso → eliminação)", atual=a.get("fluxo_tratamento",""))
     origem       = _json_prompt(a, "origem_dados", "lista",
@@ -313,6 +318,9 @@ def _coletar_campos(atual: dict = None) -> dict:
         operadores=_j(parse_lista(operadores)),
         compartilhamentos=_j(parse_lista(compart)),
         transferencia_internacional=_j(parse_lista(transf_inter)),
+        tecnologias_emergentes=int(tec_emerg),
+        decisoes_automatizadas=int(dec_auto),
+        vigilancia_zonas_publicas=int(vig_pub),
     )
 
 
@@ -333,7 +341,8 @@ def cmd_novo(_args):
                tipos_dados_sensiveis, fluxo_tratamento, origem_dados,
                local_armazenamento, eliminacao_destinacao, frequencia_tratamento,
                previsao_normativa, controladores, operadores, compartilhamentos,
-               transferencia_internacional)
+               transferencia_internacional, tecnologias_emergentes,
+               decisoes_automatizadas, vigilancia_zonas_publicas)
             VALUES
               (:nome_atividade,:finalidade,:base_legal,:categorias_titulares,
                :categorias_dados,:dados_sensiveis,:destinatarios,:transferencia_inter,
@@ -343,7 +352,8 @@ def cmd_novo(_args):
                :tipos_dados_sensiveis,:fluxo_tratamento,:origem_dados,
                :local_armazenamento,:eliminacao_destinacao,:frequencia_tratamento,
                :previsao_normativa,:controladores,:operadores,:compartilhamentos,
-               :transferencia_internacional)
+               :transferencia_internacional,:tecnologias_emergentes,
+               :decisoes_automatizadas,:vigilancia_zonas_publicas)
         """, dados)
         novo_id = cur.lastrowid
     ok(f"Atividade criada com ID #{novo_id} (versão {dados['versao']})")
@@ -501,6 +511,9 @@ def cmd_editar(args):
               previsao_normativa=:previsao_normativa, controladores=:controladores,
               operadores=:operadores, compartilhamentos=:compartilhamentos,
               transferencia_internacional=:transferencia_internacional,
+              tecnologias_emergentes=:tecnologias_emergentes,
+              decisoes_automatizadas=:decisoes_automatizadas,
+              vigilancia_zonas_publicas=:vigilancia_zonas_publicas,
               atualizado_em=:atualizado_em
             WHERE id=:id
         """, novos)

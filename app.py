@@ -23,6 +23,8 @@ from modelo_ppsi import (
     migrar_schema, proxima_versao, campos_estruturais, preenchido,
     parse_lista, parse_dict_tipos, parse_estimativa, parse_json,
     lista_para_texto, dict_tipos_para_texto, dict_estimativa_para_texto,
+    calcular_risco, SITUACOES_RIPD, PRINCIPIOS_LGPD, DIREITOS_TITULARES,
+    CRITERIO_GERAL_LABELS, CRITERIO_ESPECIFICO_LABELS,
 )
 
 # ── ropa.py shared logic ──────────────────────────────────────────────────────
@@ -280,6 +282,12 @@ app.jinja_env.globals.update(
     dict_tipos_para_texto=dict_tipos_para_texto,
     dict_estimativa_para_texto=dict_estimativa_para_texto,
     parse_json=parse_json,
+    calcular_risco=calcular_risco,
+    SITUACOES_RIPD=SITUACOES_RIPD,
+    PRINCIPIOS_LGPD=PRINCIPIOS_LGPD,
+    DIREITOS_TITULARES=DIREITOS_TITULARES,
+    CRITERIO_GERAL_LABELS=CRITERIO_GERAL_LABELS,
+    CRITERIO_ESPECIFICO_LABELS=CRITERIO_ESPECIFICO_LABELS,
     now=datetime.now,
 )
 
@@ -414,7 +422,11 @@ def index():
 @login_required
 def listar():
     registros = todos_registros()
-    return render_template("listar.html", registros=registros)
+    ripd_status = {}
+    with get_conn() as conn:
+        for row in conn.execute("SELECT atividade_id, situacao, versao FROM ripds"):
+            ripd_status[row["atividade_id"]] = {"situacao": row["situacao"], "versao": row["versao"]}
+    return render_template("listar.html", registros=registros, ripd_status=ripd_status)
 
 
 @app.route("/atividades/nova", methods=["GET", "POST"])
@@ -447,6 +459,8 @@ def ver(atividade_id):
     score, faltando = pontuacao(atividade)
     historico = []
     versoes = []
+    risco = calcular_risco(atividade)
+    ripd = None
     with get_conn() as conn:
         historico = conn.execute(
             "SELECT * FROM historico WHERE atividade_id=? ORDER BY alterado_em DESC LIMIT 20",
@@ -456,6 +470,12 @@ def ver(atividade_id):
             "SELECT * FROM versoes WHERE atividade_id=? ORDER BY id DESC LIMIT 30",
             (atividade_id,)
         ).fetchall()
+        ripd_row = conn.execute(
+            "SELECT * FROM ripds WHERE atividade_id=? ORDER BY id DESC LIMIT 1",
+            (atividade_id,)
+        ).fetchone()
+        if ripd_row:
+            ripd = dict(ripd_row)
     return render_template(
         "ver.html",
         atividade=atividade,
@@ -463,6 +483,8 @@ def ver(atividade_id):
         faltando=faltando,
         historico=historico,
         versoes=versoes,
+        risco=risco,
+        ripd=ripd,
         base_desc=BASES_LEGAIS.get(atividade.get("base_legal", ""), "—"),
     )
 
@@ -500,6 +522,13 @@ def editar(atividade_id):
                 f"UPDATE atividades SET {set_clause}, atualizado_em=:atualizado_em WHERE id=:id",
                 novos,
             )
+            # P5: alteração estrutural no ROPA marca RIPDs vinculados como "revisar"
+            if estrutural:
+                conn.execute(
+                    "UPDATE ripds SET situacao='desatualizado', atualizado_em=? "
+                    "WHERE atividade_id=? AND situacao NOT IN ('desatualizado')",
+                    (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), atividade_id),
+                )
         flash(f"Atividade #{atividade_id} atualizada (versão {nova_versao}).", "success")
         return redirect(url_for("ver", atividade_id=atividade_id))
 
@@ -546,6 +575,382 @@ def restaurar(atividade_id, versao_id):
 
     flash(f"Registro restaurado à v{row['versao']}. Nova versão {nova_versao} criada.", "success")
     return redirect(url_for("ver", atividade_id=atividade_id))
+
+
+# ── Módulo RIPD ───────────────────────────────────────────────────────────────
+
+_RIPD_COLS_EDITAVEIS = [
+    "titulo", "situacao", "versao", "justificativa", "descricao_operacoes",
+    "principios", "direitos_titulares", "riscos", "medidas_mitigacao",
+    "riscos_residuais", "restricoes_publicacao", "aprovado_por", "aprovado_em",
+]
+
+
+def get_ripd(ripd_id: int):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM ripds WHERE id=?", (ripd_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def _ripd_form_to_dict(form) -> dict:
+    principios = {}
+    for key, _label in PRINCIPIOS_LGPD:
+        v = form.get(f"principios_{key}", "").strip()
+        if v:
+            principios[key] = v
+    direitos = {}
+    for key, _label in DIREITOS_TITULARES:
+        v = form.get(f"direitos_{key}", "").strip()
+        if v:
+            direitos[key] = v
+    riscos = []
+    for linha in (form.get("riscos", "") or "").splitlines():
+        linha = linha.strip()
+        if not linha:
+            continue
+        partes = [p.strip() for p in linha.split(";")]
+        riscos.append({
+            "descricao": partes[0] if partes else "",
+            "impacto": partes[1] if len(partes) > 1 else "",
+            "probabilidade": partes[2] if len(partes) > 2 else "",
+            "aceite": partes[3] if len(partes) > 3 else "",
+        })
+    return {
+        "titulo": form.get("titulo", "").strip(),
+        "situacao": form.get("situacao", "rascunho").strip() or "rascunho",
+        "justificativa": form.get("justificativa", "").strip(),
+        "descricao_operacoes": form.get("descricao_operacoes", "").strip(),
+        "principios": json.dumps(principios, ensure_ascii=False),
+        "direitos_titulares": json.dumps(direitos, ensure_ascii=False),
+        "riscos": json.dumps(riscos, ensure_ascii=False),
+        "medidas_mitigacao": json.dumps(parse_lista(form.get("medidas_mitigacao", "")), ensure_ascii=False),
+        "riscos_residuais": json.dumps(parse_lista(form.get("riscos_residuais", "")), ensure_ascii=False),
+        "restricoes_publicacao": json.dumps(parse_lista(form.get("restricoes_publicacao", "")), ensure_ascii=False),
+    }
+
+
+def _riscos_para_texto(raw) -> str:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw else []
+        except Exception:
+            return raw
+    if not isinstance(raw, list):
+        return ""
+    linhas = []
+    for r in raw:
+        if isinstance(r, dict):
+            linhas.append("; ".join(str(r.get(k, "") or "") for k in ("descricao", "impacto", "probabilidade", "aceite")))
+        else:
+            linhas.append(str(r))
+    return "\n".join(linhas)
+
+
+@app.route("/atividades/<int:atividade_id>/ripd/novo", methods=["POST"])
+@login_required
+def ripd_novo(atividade_id):
+    atividade = get_atividade(atividade_id)
+    if not atividade:
+        flash("Atividade não encontrada.", "danger")
+        return redirect(url_for("listar"))
+    with get_conn() as conn:
+        exists = conn.execute("SELECT id FROM ripds WHERE atividade_id=? LIMIT 1", (atividade_id,)).fetchone()
+        if exists:
+            flash("Já existe um RIPD para esta atividade.", "warning")
+            return redirect(url_for("ripd_ver", ripd_id=exists["id"]))
+        risco = calcular_risco(atividade)
+        geral = risco["geral"][0] if risco["geral"] else ""
+        espec = risco["especifico"][0] if risco["especifico"] else ""
+        just = (
+            "Tratamento identificado como de alto risco (Res. CD/ANPD nº 2/2022, art. 4º): "
+            f"critério geral — {CRITERIO_GERAL_LABELS.get(geral, geral) or '(não preenchido)'}; "
+            f"critério específico — {CRITERIO_ESPECIFICO_LABELS.get(espec, espec) or '(não preenchido)'}."
+        )
+        cur = conn.execute("""
+            INSERT INTO ripds (atividade_id, titulo, situacao, versao, justificativa,
+               criterio_geral, criterio_especifico, fatores_risco, alto_risco,
+               descricao_operacoes)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (atividade_id, f"RIPD – {atividade['nome_atividade']}", "rascunho", "1.0", just,
+              geral, espec, json.dumps(risco["fatores"], ensure_ascii=False),
+              1 if risco["alto_risco"] else 0,
+              (atividade.get("fluxo_tratamento") or "") + "\n\n" + (atividade.get("finalidade") or "")))
+        ripd_id = cur.lastrowid
+        row = conn.execute("SELECT * FROM ripds WHERE id=?", (ripd_id,)).fetchone()
+        conn.execute("""
+            INSERT INTO versoes_ripd (ripd_id, versao, sintese, responsavel, snapshot)
+            VALUES (?,?,?,?,?)
+        """, (ripd_id, "1.0", "v1.0 – criação do RIPD", _responsavel_atual(), _snapshot_json(dict(row))))
+    flash("RIPD criado a partir do gatilho do ROPA.", "success")
+    return redirect(url_for("ripd_ver", ripd_id=ripd_id))
+
+
+@app.route("/ripds/<int:ripd_id>")
+@login_required
+def ripd_ver(ripd_id):
+    ripd = get_ripd(ripd_id)
+    if not ripd:
+        flash("RIPD não encontrado.", "danger")
+        return redirect(url_for("listar"))
+    atividade = get_atividade(ripd["atividade_id"]) or {}
+    versoes_ripd = []
+    with get_conn() as conn:
+        versoes_ripd = conn.execute(
+            "SELECT * FROM versoes_ripd WHERE ripd_id=? ORDER BY id DESC LIMIT 30", (ripd_id,)
+        ).fetchall()
+    return render_template("ripd_ver.html", ripd=ripd, atividade=atividade, versoes_ripd=versoes_ripd)
+
+
+@app.route("/ripds/<int:ripd_id>/editar", methods=["GET", "POST"])
+@login_required
+def ripd_editar(ripd_id):
+    ripd = get_ripd(ripd_id)
+    if not ripd:
+        flash("RIPD não encontrado.", "danger")
+        return redirect(url_for("listar"))
+    atividade = get_atividade(ripd["atividade_id"]) or {}
+
+    if request.method == "POST":
+        novos = _ripd_form_to_dict(request.form)
+        with get_conn() as conn:
+            estrutural = any(
+                novos.get(c) != ripd.get(c) for c in ("justificativa", "riscos", "descricao_operacoes")
+            )
+            nova_versao = proxima_versao(ripd.get("versao"), estrutural)
+            sintese = f"v{nova_versao} – " + _sintese_alteracoes(ripd, novos)
+            novos["versao"] = nova_versao
+            novos["aprovado_por"] = ripd.get("aprovado_por")
+            novos["aprovado_em"] = ripd.get("aprovado_em")
+            novos["atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            novos["id"] = ripd_id
+            _registrar_versao_ripd(conn, ripd_id, nova_versao, sintese,
+                                   _snapshot_json({**ripd, **novos}), _responsavel_atual())
+            set_clause = ",".join(f"{c}=:{c}" for c in _RIPD_COLS_EDITAVEIS)
+            conn.execute(
+                f"UPDATE ripds SET {set_clause}, atualizado_em=:atualizado_em WHERE id=:id",
+                novos,
+            )
+        flash(f"RIPD atualizado (versão {nova_versao}).", "success")
+        return redirect(url_for("ripd_ver", ripd_id=ripd_id))
+
+    return render_template("ripd_form.html", ripd=ripd, atividade=atividade, titulo=f"Editar RIPD #{ripd_id}")
+
+
+@app.route("/ripds/<int:ripd_id>/aprovar", methods=["POST"])
+@login_required
+def ripd_aprovar(ripd_id):
+    with get_conn() as conn:
+        cur_ripd = conn.execute("SELECT * FROM ripds WHERE id=?", (ripd_id,)).fetchone()
+        if not cur_ripd:
+            flash("RIPD não encontrado.", "danger")
+            return redirect(url_for("listar"))
+        ripd = dict(cur_ripd)
+        nova_versao = proxima_versao(ripd.get("versao"), True)
+        novos = dict(ripd)
+        novos["versao"] = nova_versao
+        novos["situacao"] = "aprovado"
+        novos["aprovado_por"] = _responsavel_atual()
+        novos["aprovado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        novos["atualizado_em"] = novos["aprovado_em"]
+        sintese = f"v{nova_versao} – aprovação pelo controlador"
+        _registrar_versao_ripd(conn, ripd_id, nova_versao, sintese,
+                               _snapshot_json({**ripd, **novos}), _responsavel_atual())
+        set_clause = ",".join(f"{c}=:{c}" for c in _RIPD_COLS_EDITAVEIS)
+        conn.execute(f"UPDATE ripds SET {set_clause}, atualizado_em=:atualizado_em WHERE id=:id", novos)
+    flash(f"RIPD aprovado (versão {nova_versao}).", "success")
+    return redirect(url_for("ripd_ver", ripd_id=ripd_id))
+
+
+@app.route("/ripds/<int:ripd_id>/restaurar/<int:versao_id>", methods=["POST"])
+@login_required
+def ripd_restaurar(ripd_id, versao_id):
+    with get_conn() as conn:
+        v = conn.execute("SELECT * FROM versoes_ripd WHERE id=? AND ripd_id=?", (versao_id, ripd_id)).fetchone()
+        if not v:
+            flash("Versão do RIPD não encontrada.", "danger")
+            return redirect(url_for("ripd_ver", ripd_id=ripd_id))
+        cur = conn.execute("SELECT versao FROM ripds WHERE id=?", (ripd_id,)).fetchone()
+        versao_atual = (cur["versao"] if cur else None) or "1.0"
+        snapshot = json.loads(v["snapshot"] or "{}")
+        for k in ("id", "criado_em", "atualizado_em"):
+            snapshot.pop(k, None)
+        nova_versao = proxima_versao(versao_atual, True)
+        snapshot["versao"] = nova_versao
+        snapshot["situacao"] = "rascunho"
+        snapshot["aprovado_por"] = None
+        snapshot["aprovado_em"] = None
+        snapshot["atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        snapshot["id"] = ripd_id
+        sintese = f"v{nova_versao} – reversão à v{v['versao']} (restauração)"
+        _registrar_versao_ripd(conn, ripd_id, nova_versao, sintese,
+                               _snapshot_json(snapshot), _responsavel_atual())
+        set_clause = ",".join(f"{c}=:{c}" for c in _RIPD_COLS_EDITAVEIS)
+        conn.execute(f"UPDATE ripds SET {set_clause}, atualizado_em=:atualizado_em WHERE id=:id", snapshot)
+    flash(f"RIPD restaurado à v{v['versao']}. Nova versão {nova_versao} criada.", "success")
+    return redirect(url_for("ripd_ver", ripd_id=ripd_id))
+
+
+def _registrar_versao_ripd(conn, ripd_id, versao, sintese, snapshot, responsavel):
+    conn.execute("""
+        INSERT INTO versoes_ripd (ripd_id, versao, sintese, responsavel, snapshot)
+        VALUES (?,?,?,?,?)
+    """, (ripd_id, versao, sintese, responsavel, snapshot))
+
+
+def _gerar_pdf_ripd(ripd: dict, atividade: dict, publico: bool) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (HRFlowable, Paragraph, SimpleDocTemplate,
+                                    Spacer, Table, TableStyle)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    cor_azul = colors.HexColor("#1F3D7A")
+    cor_cinza = colors.HexColor("#5A5A5A")
+    cor_leve = colors.HexColor("#EEF2FF")
+
+    titulo_style = ParagraphStyle("tit", fontSize=15, fontName="Helvetica-Bold",
+                                  textColor=cor_azul, alignment=TA_CENTER, spaceAfter=4)
+    sub_style = ParagraphStyle("sub", fontSize=9, fontName="Helvetica",
+                               textColor=cor_cinza, alignment=TA_CENTER)
+    secao_style = ParagraphStyle("sec", fontSize=11, fontName="Helvetica-Bold",
+                                 textColor=cor_azul, spaceBefore=12, spaceAfter=5)
+    campo_style = ParagraphStyle("cmp", fontSize=8.5, fontName="Helvetica", leading=12)
+    label_style = ParagraphStyle("lbl", fontSize=8.5, fontName="Helvetica-Bold", textColor=cor_cinza)
+    rodape_style = ParagraphStyle("rod", fontSize=7, fontName="Helvetica", textColor=cor_cinza, alignment=TA_CENTER)
+
+    story = []
+    story.append(Paragraph("RELATÓRIO DE IMPACTO À PROTEÇÃO DE DADOS PESSOAIS (RIPD)", titulo_style))
+    story.append(Paragraph("PPSI 2.0 – controle 23.3 · LGPD, art. 38", sub_style))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(HRFlowable(width="100%", thickness=2, color=cor_azul))
+    if publico:
+        story.append(Paragraph("VERSÃO PUBLICIZÁVEL", ParagraphStyle(
+            "pub", fontSize=9, fontName="Helvetica-Bold", textColor=colors.red, spaceBefore=6)))
+    story.append(Spacer(1, 0.3*cm))
+
+    def sec(titulo):
+        story.append(Paragraph(titulo, secao_style))
+
+    def linha(label, val):
+        v = str(val or "").strip() or "—"
+        tbl = Table([[Paragraph(label, label_style), Paragraph(v, campo_style)]],
+                    colWidths=[4.5*cm, 12*cm])
+        tbl.setStyle(TableStyle([
+            ("FONTSIZE", (0,0), (-1,-1), 8.5),
+            ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.white, cor_leve]),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("TOPPADDING", (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("LEFTPADDING", (0,0), (-1,-1), 6),
+            ("BOX", (0,0), (-1,-1), 0.4, cor_cinza),
+            ("INNERGRID", (0,0), (-1,-1), 0.3, cor_cinza),
+        ]))
+        story.append(tbl)
+
+    # 1. Contexto
+    sec("1. Contexto do produto/serviço")
+    linha("Atividade (ROPA)", f"#{atividade.get('id','')} {atividade.get('nome_atividade','')}")
+    linha("Título do RIPD", ripd.get("titulo"))
+    linha("Unidade responsável", atividade.get("unidade_controladora"))
+    linha("Situação", ripd.get("situacao"))
+    linha("Versão", ripd.get("versao"))
+    linha("Justificativa (gatilho)", ripd.get("justificativa"))
+    fatores = parse_json(ripd.get("fatores_risco"))
+    if fatores:
+        linha("Fatores de risco identificados", "; ".join(fatores))
+
+    # 2. Tratamento
+    sec("2. Tratamento dos dados pessoais")
+    linha("Descrição das operações", ripd.get("descricao_operacoes"))
+    linha("Base legal", f"{atividade.get('base_legal','')} – {BASES_LEGAIS.get(atividade.get('base_legal',''),'')}")
+    linha("Titulares", atividade.get("categorias_titulares"))
+    linha("Tipos de dados", atividade.get("categorias_dados"))
+    linha("Fluxo", atividade.get("fluxo_tratamento"))
+    linha("Compartilhamento", atividade.get("destinatarios"))
+    linha("Transferência internacional", lista_para_texto(parse_json(ripd.get("transferencia_inter")) or atividade.get("transferencia_inter")))
+
+    # 3. Princípios
+    sec("3. Análise dos princípios da LGPD (art. 6º)")
+    principios = parse_json(ripd.get("principios"))
+    if principios:
+        for key, label in PRINCIPIOS_LGPD:
+            if principios.get(key):
+                linha(label, principios[key])
+    else:
+        linha("Princípios", "Não preenchido")
+
+    # 4. Direitos
+    sec("4. Garantia dos direitos dos titulares (art. 18)")
+    direitos = parse_json(ripd.get("direitos_titulares"))
+    if direitos:
+        for key, label in DIREITOS_TITULARES:
+            if direitos.get(key):
+                linha(label, direitos[key])
+    else:
+        linha("Direitos", "Não preenchido")
+
+    # 5. Gestão de riscos (RESTRITO na versão publicizável)
+    sec("5. Gestão de riscos")
+    if publico:
+        story.append(Paragraph(
+            "<b>Conteúdo restrito.</b> A descrição de riscos, medidas de mitigação e riscos residuais foi "
+            "suprimida nesta versão por tratar-se de informação crítica de segurança da informação "
+            "(Portaria SGD/MGI nº 9.511/2025, art. 2º, III e art. 5º).", campo_style))
+        restr = parse_json(ripd.get("restricoes_publicacao"))
+        if restr:
+            story.append(Spacer(1, 0.2*cm))
+            linha("Conteúdo suprimido", "; ".join(restr))
+    else:
+        riscos = parse_json(ripd.get("riscos"))
+        if riscos:
+            for i, r in enumerate(riscos, 1):
+                if isinstance(r, dict):
+                    linha(f"Risco {i}", f"Descrição: {r.get('descricao','')} · Impacto: {r.get('impacto','')} · "
+                          f"Probabilidade: {r.get('probabilidade','')} · Aceite: {r.get('aceite','')}")
+                else:
+                    linha(f"Risco {i}", str(r))
+        else:
+            linha("Riscos", "Não preenchido")
+        linha("Medidas de mitigação", "; ".join(parse_json(ripd.get("medidas_mitigacao"))))
+        linha("Riscos residuais", "; ".join(parse_json(ripd.get("riscos_residuais"))))
+
+    # 6. Aprovação
+    sec("6. Aprovação")
+    linha("Aprovação (controlador)", ripd.get("aprovado_por") or "—")
+    linha("Data da aprovação", ripd.get("aprovado_em") or "—")
+
+    story.append(Spacer(1, 0.8*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=cor_cinza))
+    story.append(Paragraph(
+        f"{ORGANIZACAO} · {UNIDADE} · Encarregado: {ENCARREGADO} · "
+        f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}", rodape_style))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf.read()
+
+
+@app.route("/ripds/<int:ripd_id>/exportar")
+@login_required
+def ripd_exportar(ripd_id):
+    ripd = get_ripd(ripd_id)
+    if not ripd:
+        flash("RIPD não encontrado.", "danger")
+        return redirect(url_for("listar"))
+    atividade = get_atividade(ripd["atividade_id"]) or {}
+    publico = request.args.get("publico", "0") == "1"
+    pdf_bytes = _gerar_pdf_ripd(ripd, atividade, publico)
+    nome = f"ripd_{ripd_id}{'_publico' if publico else ''}.pdf"
+    return Response(
+        pdf_bytes, mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nome}"},
+    )
 
 
 @app.route("/atividades/<int:atividade_id>/excluir", methods=["POST"])
@@ -1045,6 +1450,9 @@ def _form_to_dict(form) -> dict:
         operadores=_j_lista(form.get("operadores", "")),
         compartilhamentos=_j_lista(form.get("compartilhamentos", "")),
         transferencia_internacional=json.dumps(transf_int, ensure_ascii=False),
+        tecnologias_emergentes=1 if form.get("tecnologias_emergentes") else 0,
+        decisoes_automatizadas=1 if form.get("decisoes_automatizadas") else 0,
+        vigilancia_zonas_publicas=1 if form.get("vigilancia_zonas_publicas") else 0,
     )
 
 
@@ -1057,7 +1465,8 @@ _COLUNAS_INSERT = [
     "tipos_dados_sensiveis", "fluxo_tratamento", "origem_dados",
     "local_armazenamento", "eliminacao_destinacao", "frequencia_tratamento",
     "previsao_normativa", "controladores", "operadores", "compartilhamentos",
-    "transferencia_internacional",
+    "transferencia_internacional", "tecnologias_emergentes", "decisoes_automatizadas",
+    "vigilancia_zonas_publicas",
 ]
 
 

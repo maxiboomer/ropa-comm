@@ -71,6 +71,57 @@
       </div>
     </div>
 
+    <!-- RIPD -->
+    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
+                   color:var(--tre-azul);font-weight:700;margin:0;">
+          <i class="bi bi-file-earmark-text me-1"></i> RIPD — Relatório de Impacto
+        </h6>
+        {% if ripd %}
+          <span class="badge {{ {'aprovado':'text-bg-success','publicado':'text-bg-success','desatualizado':'text-bg-danger','rascunho':'text-bg-secondary','em_revisao':'text-bg-warning text-dark'}.get(ripd.situacao,'text-bg-secondary') }}">
+            v{{ ripd.versao }} · {{ {'rascunho':'Rascunho','em_revisao':'Em revisão','aprovado':'Aprovado','publicado':'Publicado','desatualizado':'Desatualizado (revisar)'}.get(ripd.situacao, ripd.situacao) }}
+          </span>
+        {% endif %}
+      </div>
+
+      {% if risco.recomenda %}
+        <div class="mt-2" style="font-size:0.8rem;">
+          {% if not ripd %}
+            <span class="badge text-bg-warning text-dark">⚠ RIPD recomendado</span>
+            <span style="color:#555;"> — operação com indício de alto risco.</span>
+          {% elif ripd.situacao == 'desatualizado' %}
+            <span class="badge text-bg-danger">Revisão necessária</span>
+            <span style="color:#555;"> — a atividade mudou e o RIPD precisa ser revisto.</span>
+          {% endif %}
+          {% if risco.fatores %}
+          <div style="font-size:0.72rem;color:#888;margin-top:0.3rem;">
+            Fatores: {% for f in risco.fatores %}
+              <span class="badge text-bg-light text-dark">{{ CRITERIO_GERAL_LABELS.get(f) or CRITERIO_ESPECIFICO_LABELS.get(f) or f }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          {% if ripd %}
+            <a href="{{ url_for('ripd_ver', ripd_id=ripd.id) }}" class="btn btn-sm btn-tre">
+              <i class="bi bi-eye"></i> Ver RIPD
+            </a>
+          {% else %}
+            <form action="{{ url_for('ripd_novo', atividade_id=atividade.id) }}" method="post">
+              <button class="btn btn-sm btn-tre">
+                <i class="bi bi-plus-lg"></i> Gerar RIPD
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="mt-1" style="font-size:0.8rem;color:#198754;">
+          <i class="bi bi-check-circle-fill"></i> Sem indício de alto risco — RIPD não obrigatório pelo gatilho automático.
+        </div>
+      {% endif %}
+    </div>
+
     <!-- Detalhes -->
     <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
       <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
