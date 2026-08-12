@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} · RoPA{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<form method="post" novalidate>
+  <div class="row g-3">
+    <div class="col-lg-8">
+
+      <!-- Contexto -->
+      <div class="form-card">
+        <h6><i class="bi bi-file-earmark-text me-1"></i> Contexto e Justificativa</h6>
+        <div class="mb-3">
+          <label class="form-label">Título</label>
+          <input type="text" name="titulo" class="form-control form-control-sm"
+                 value="{{ ripd.titulo if ripd else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Situação</label>
+          <select name="situacao" class="form-select form-select-sm">
+            {% for val, rotulo in SITUACOES_RIPD %}
+            <option value="{{ val }}" {% if (ripd.situacao if ripd else 'rascunho') == val %}selected{% endif %}>{{ rotulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Justificativa (gatilho de alto risco)</label>
+          <textarea name="justificativa" class="form-control form-control-sm" rows="3"
+                    placeholder="Critério geral + específico e razões (Res. CD/ANPD 2/2022, art. 4º)">{{ ripd.justificativa if ripd else '' }}</textarea>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Descrição das Operações de Tratamento</label>
+          <textarea name="descricao_operacoes" class="form-control form-control-sm" rows="4"
+                    placeholder="Finalidades, dados, fluxo, agentes (coerente com o ROPA/controle 19)">{{ ripd.descricao_operacoes if ripd else '' }}</textarea>
+        </div>
+        {% if ripd %}
+        <div style="font-size:0.75rem;color:#888;margin-top:0.6rem;">
+          Versão atual: <strong>{{ ripd.versao }}</strong>
+          {% if ripd.alto_risco %}<span class="badge text-bg-danger ms-1">Alto risco</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Princípios -->
+      <div class="form-card">
+        <h6><i class="bi bi-list-check me-1"></i> Análise dos Princípios da LGPD (art. 6º)</h6>
+        {% set _princ = parse_json(ripd.principios) if (ripd and ripd.principios) else {} %}
+        {% for key, label in PRINCIPIOS_LGPD %}
+        <div class="mb-2">
+          <label class="form-label">{{ label }}</label>
+          <textarea name="principios_{{ key }}" class="form-control form-control-sm" rows="2"
+                    placeholder="Como o tratamento atende a este princípio...">{{ _princ.get(key, '') }}</textarea>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Direitos -->
+      <div class="form-card">
+        <h6><i class="bi bi-person-check me-1"></i> Garantia dos Direitos dos Titulares (art. 18)</h6>
+        {% set _dir = parse_json(ripd.direitos_titulares) if (ripd and ripd.direitos_titulares) else {} %}
+        {% for key, label in DIREITOS_TITULARES %}
+        <div class="mb-2">
+          <label class="form-label">{{ label }}</label>
+          <textarea name="direitos_{{ key }}" class="form-control form-control-sm" rows="2"
+                    placeholder="Canal, prazo e como o direito é exercido...">{{ _dir.get(key, '') }}</textarea>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Gestão de riscos -->
+      <div class="form-card">
+        <h6><i class="bi bi-shield-exclamation me-1"></i> Gestão de Riscos <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(restrito na versão publicizável)</span></h6>
+        <div class="mb-3">
+          <label class="form-label">Riscos identificados</label>
+          <textarea name="riscos" class="form-control form-control-sm" rows="4"
+                    placeholder="Uma linha por risco, formato: descrição; impacto; probabilidade; aceite">{% for r in parse_json(ripd.riscos) if ripd %}{{ r.descricao }}; {{ r.impacto }}; {{ r.probabilidade }}; {{ r.aceite }}
+{% endfor %}</textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Medidas de mitigação</label>
+          <textarea name="medidas_mitigacao" class="form-control form-control-sm" rows="3"
+                    placeholder="Uma por linha">{{ lista_para_texto(ripd.medidas_mitigacao) if ripd else '' }}</textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Riscos residuais (acima do nível de aceitação)</label>
+          <textarea name="riscos_residuais" class="form-control form-control-sm" rows="3"
+                    placeholder="Uma por linha">{{ lista_para_texto(ripd.riscos_residuais) if ripd else '' }}</textarea>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Conteúdo suprimido na versão publicizável</label>
+          <textarea name="restricoes_publicacao" class="form-control form-control-sm" rows="2"
+                    placeholder="O que foi ocultado na versão pública (ex.: riscos, medidas, arquitetura)">{{ lista_para_texto(ripd.restricoes_publicacao) if ripd else '' }}</textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+      <div class="form-card sticky-top" style="top:72px;">
+        <h6><i class="bi bi-info-circle me-1"></i> Referências</h6>
+        <ul style="font-size:0.75rem;color:#666;padding-left:1rem;margin:0;">
+          <li class="mb-1"><strong>Controle 23.3</strong> — RIPD de tratamentos de alto risco</li>
+          <li class="mb-1"><strong>LGPD art. 38</strong> — relatório de impacto</li>
+          <li class="mb-1"><strong>Res. CD/ANPD 2/2022</strong> — critérios de alto risco</li>
+          <li class="mb-1"><strong>Controle 19 (ROPA)</strong> — atividade vinculada</li>
+          <li>Guia de RIPD (PPSI 2.0)</li>
+        </ul>
+        <hr style="border-color:#eee;">
+        <div style="font-size:0.72rem;color:#aaa;margin-bottom:1rem;">
+          Conteúdo de riscos/medidas é tratado como <strong>informação crítica</strong> (Port. 9.511/2025) e é suprimido na versão publicizável.
+        </div>
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-tre"><i class="bi bi-check-lg me-1"></i> Salvar RIPD</button>
+          <a href="{{ url_for('ripd_ver', ripd_id=ripd.id) }}" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

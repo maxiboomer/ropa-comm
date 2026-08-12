@@ -137,6 +137,24 @@
           <textarea name="tipos_dados_sensiveis" class="form-control form-control-sm" rows="2"
                     placeholder="Um por linha: saúde, biometria facial, filiação sindical...">{{ lista_para_texto(atividade.tipos_dados_sensiveis) if atividade else '' }}</textarea>
         </div>
+
+        <div class="mt-3 pt-2" style="border-top:1px dashed #ddd;">
+          <label class="form-label mb-2">
+            Critérios de alto risco <small>(gatilho de RIPD — Res. CD/ANPD nº 2/2022)</small>
+          </label>
+          {% set flags = ['tecnologias_emergentes','decisoes_automatizadas','vigilancia_zonas_publicas'] %}
+          {% set labels = {'tecnologias_emergentes':'Uso de tecnologias emergentes/inovadoras','decisoes_automatizadas':'Decisões unicamente automatizadas (perfilamento)','vigilancia_zonas_publicas':'Vigilância/controle de zonas acessíveis ao público'} %}
+          {% for f in flags %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="{{ f }}" id="{{ f }}" value="1"
+                   {% if atividade and atividade[f] %}checked{% endif %}>
+            <label class="form-check-label" for="{{ f }}" style="font-size:0.82rem;">{{ labels[f] }}</label>
+          </div>
+          {% endfor %}
+          <div style="font-size:0.72rem;color:#888;margin-top:0.3rem;">
+            Dados sensíveis, crianças/adolescentes/idosos e larga escala (estimativa de titulares) são detectados automaticamente para o gatilho de RIPD.
+          </div>
+        </div>
       </div>
 
       <!-- Ciclo de vida dos dados (Guia 4.3) -->

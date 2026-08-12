@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}RIPD #{{ ripd.id }} · RoPA{% endblock %}
+{% block page_title %}RIPD #{{ ripd.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex gap-2 mb-3">
+  <a href="{{ url_for('ver', atividade_id=ripd.atividade_id) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Atividade
+  </a>
+  <a href="{{ url_for('ripd_editar', ripd_id=ripd.id) }}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-pencil"></i> Editar
+  </a>
+  {% if ripd.situacao not in ('aprovado','publicado') %}
+  <form action="{{ url_for('ripd_aprovar', ripd_id=ripd.id) }}" method="post"
+        onsubmit="return confirm('Aprovar o RIPD pelo controlador?')">
+    <button class="btn btn-sm btn-success"><i class="bi bi-check2-circle"></i> Aprovar</button>
+  </form>
+  {% endif %}
+  <div class="ms-auto d-flex gap-2">
+    <a href="{{ url_for('ripd_exportar', ripd_id=ripd.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-file-earmark-pdf"></i> Exportar (integral)
+    </a>
+    <a href="{{ url_for('ripd_exportar', ripd_id=ripd.id, publico=1) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-globe"></i> Exportar (publicizável)
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <!-- Cabeçalho -->
+    <div class="bg-white border rounded p-3 mb-3" style="border-color:var(--tre-borda)!important;">
+      <div class="d-flex align-items-start justify-content-between gap-2">
+        <div>
+          <h5 style="color:var(--tre-azul);font-weight:700;margin-bottom:0.2rem;">{{ ripd.titulo }}</h5>
+          <div style="font-size:0.8rem;color:#888;">
+            Atividade #{{ ripd.atividade_id }} — {{ atividade.nome_atividade if atividade else '' }}
+          </div>
+        </div>
+        <div class="d-flex flex-column gap-1 align-items-end flex-shrink-0">
+          {% if ripd.alto_risco %}<span class="badge text-bg-danger">Alto risco</span>{% endif %}
+          <span class="badge {{ {'aprovado':'text-bg-success','publicado':'text-bg-success','desatualizado':'text-bg-danger','rascunho':'text-bg-secondary','em_revisao':'text-bg-warning text-dark'}.get(ripd.situacao,'text-bg-secondary') }}">
+            v{{ ripd.versao }} · {{ {'rascunho':'Rascunho','em_revisao':'Em revisão','aprovado':'Aprovado','publicado':'Publicado','desatualizado':'Desatualizado (revisar)'}.get(ripd.situacao, ripd.situacao) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="mt-2" style="font-size:0.78rem;color:#666;">
+        <strong>Justificativa (gatilho):</strong> {{ ripd.justificativa or '—' }}
+      </div>
+      {% set _fatores = parse_json(ripd.fatores_risco) %}
+      {% if _fatores %}
+      <div style="font-size:0.75rem;color:#888;margin-top:0.3rem;">
+        Fatores: {% for f in _fatores %}
+          <span class="badge text-bg-light text-dark">{{ CRITERIO_GERAL_LABELS.get(f) or CRITERIO_ESPECIFICO_LABELS.get(f) or f }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Conteúdo -->
+    <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
+      {% macro row(label, value) %}
+      <div class="detail-row"><span class="detail-label">{{ label }}</span><span class="detail-value">{{ value if value else '—' }}</span></div>
+      {% endmacro %}
+
+      <h6 class="sec-tit">2. Tratamento dos dados pessoais</h6>
+      {{ row("Descrição das operações", ripd.descricao_operacoes) }}
+
+      <h6 class="sec-tit">3. Análise dos princípios da LGPD (art. 6º)</h6>
+      {% set _princ = parse_json(ripd.principios) if ripd.principios else {} %}
+      {% for key, label in PRINCIPIOS_LGPD %}
+        {% if _princ.get(key) %}{{ row(label, _princ.get(key)) }}{% endif %}
+      {% endfor %}
+      {% if not _princ %}{{ row("Princípios", "Não preenchido") }}{% endif %}
+
+      <h6 class="sec-tit">4. Garantia dos direitos dos titulares (art. 18)</h6>
+      {% set _dir = parse_json(ripd.direitos_titulares) if ripd.direitos_titulares else {} %}
+      {% for key, label in DIREITOS_TITULARES %}
+        {% if _dir.get(key) %}{{ row(label, _dir.get(key)) }}{% endif %}
+      {% endfor %}
+      {% if not _dir %}{{ row("Direitos", "Não preenchido") }}{% endif %}
+
+      <h6 class="sec-tit">5. Gestão de riscos</h6>
+      {% set _riscos = parse_json(ripd.riscos) %}
+      {% if _riscos %}
+        {% for r in _riscos %}
+          {{ row("Risco " ~ loop.index, r.descricao ~ " · Impacto: " ~ r.impacto ~ " · Probab.: " ~ r.probabilidade ~ " · Aceite: " ~ r.aceite) }}
+        {% endfor %}
+      {% else %}{{ row("Riscos", "Não preenchido") }}{% endif %}
+      {{ row("Medidas de mitigação", lista_para_texto(ripd.medidas_mitigacao)) }}
+      {{ row("Riscos residuais", lista_para_texto(ripd.riscos_residuais)) }}
+
+      <h6 class="sec-tit">6. Aprovação</h6>
+      {{ row("Aprovado por (controlador)", ripd.aprovado_por) }}
+      {{ row("Data da aprovação", ripd.aprovado_em) }}
+      {{ row("Versão", ripd.versao) }}
+      {{ row("Criado em", ripd.criado_em) }}
+      {{ row("Atualizado em", ripd.atualizado_em) }}
+    </div>
+  </div>
+
+  <!-- Sidebar: versões -->
+  <div class="col-lg-4">
+    <div class="bg-white border rounded p-3" style="border-color:var(--tre-borda)!important;">
+      <h6 style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.07em;
+                 color:var(--tre-azul);font-weight:700;margin-bottom:0.75rem;">
+        <i class="bi bi-arrow-counterclockwise me-1"></i> Versões do RIPD
+      </h6>
+      {% if versoes_ripd %}
+        {% for v in versoes_ripd %}
+        <div style="font-size:0.75rem;border-bottom:1px solid #f0f0f0;padding:0.45rem 0;">
+          <div class="d-flex justify-content-between">
+            <span class="badge text-bg-light text-dark">v{{ v.versao }}</span>
+            <span style="color:#aaa;font-size:0.68rem;">{{ v.criado_em[:16] }}</span>
+          </div>
+          <div style="color:#555;margin-top:0.2rem;">{{ v.sintese or '—' }}</div>
+          {% if v.versao != (ripd.versao or '1.0') %}
+          <form action="{{ url_for('ripd_restaurar', ripd_id=ripd.id, versao_id=v.id) }}" method="post" class="mt-1"
+                onsubmit="return confirm('Restaurar o RIPD à v{{ v.versao }}? Uma nova versão será criada.');">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.7rem;">
+              <i class="bi bi-arrow-counterclockwise"></i> Restaurar v{{ v.versao }}
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:0.78rem;color:#aaa;margin:0;">Nenhuma versão registrada.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+.sec-tit{font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--tre-azul);font-weight:700;margin:1rem 0 .2rem;border-bottom:1px solid #eef2ff;padding-bottom:.3rem;}
+</style>
+{% endblock %}
