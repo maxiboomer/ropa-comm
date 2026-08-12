@@ -3,281 +3,254 @@
 {% block page_title %}{{ titulo }}{% endblock %}
 
 {% block content %}
-<form method="post" novalidate>
+<form method="post" novalidate id="wizForm">
+  <!-- Stepper -->
+  <div class="stepper">
+    {% set steps = [
+      ('Identificação','4.1'),('Finalidade','4.4'),('Dados pessoais','4.2'),
+      ('Ciclo de vida','4.3'),('Agentes','4.5'),('Compartilhamento','4.6'),('Segurança','Art.46')] %}
+    {% for s in steps %}
+    <div class="step" onclick="show({{ loop.index0 }})">
+      <div class="dot">{{ loop.index }}</div>
+      <div class="lbl">{{ s[0] }}<br><span style="font-size:.58rem;">{{ s[1] }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="progress mb-3" style="height:4px;"><div class="progress-bar" id="wizProgress" style="width:14.28%"></div></div>
+
   <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
 
-      <!-- Identificação (Guia 4.1) -->
-      <div class="form-card">
-        <h6><i class="bi bi-tag me-1"></i> Identificação <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(Guia PPSI 2.0 · 4.1)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Nome da Atividade / Produto / Serviço <span class="req">*</span></label>
-          <input type="text" name="nome_atividade" class="form-control form-control-sm"
-                 value="{{ atividade.nome_atividade if atividade else '' }}"
-                 placeholder="Ex: Cadastro de Visitantes e Credenciamento" required>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-6">
-            <label class="form-label">Unidade Administrativa Responsável</label>
-            <input type="text" name="unidade_controladora" class="form-control form-control-sm"
-                   value="{{ atividade.unidade_controladora if atividade else '' }}"
-                   placeholder="Ex: Unidade de TI">
+      <!-- Etapa 1: Identificação -->
+      <div class="wiz-step">
+        <div class="form-card">
+          <h6><i class="bi bi-tag"></i> Identificação <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(Guia 4.1)</span></h6>
+          <div class="mb-3"><label class="form-label">Nome da Atividade / Produto / Serviço <span class="req">*</span></label>
+            <input type="text" name="nome_atividade" class="form-control form-control-sm" value="{{ atividade.nome_atividade if atividade else '' }}" placeholder="Ex: Cadastro de Visitantes e Credenciamento" required></div>
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label">Unidade Administrativa Responsável</label>
+              <input type="text" name="unidade_controladora" class="form-control form-control-sm" value="{{ atividade.unidade_controladora if atividade else '' }}" placeholder="Ex: Unidade de TI"></div>
+            <div class="col-md-6"><label class="form-label">Processo SEI</label>
+              <input type="text" name="sistema_sei" class="form-control form-control-sm" value="{{ atividade.sistema_sei if atividade else '' }}" placeholder="Ex: SEI 0006491-21.2026..."></div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">Processo SEI</label>
-            <input type="text" name="sistema_sei" class="form-control form-control-sm"
-                   value="{{ atividade.sistema_sei if atividade else '' }}"
-                   placeholder="Ex: SEI 0006491-21.2026...">
+          <div class="row g-2 mt-1">
+            <div class="col-md-6"><label class="form-label">Responsável pelo Preenchimento</label>
+              <input type="text" name="responsavel_preenchimento" class="form-control form-control-sm" value="{{ atividade.responsavel_preenchimento if atividade else '' }}" placeholder="Nome, matrícula, cargo e data"></div>
+            <div class="col-md-6"><label class="form-label">Situação do Registro</label>
+              <select name="situacao" class="form-select form-select-sm">
+                {% for val, rotulo in SITUACOES %}<option value="{{ val }}" {% if (atividade.situacao if atividade else 'em_andamento') == val %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+              </select></div>
           </div>
         </div>
-        <div class="row g-2 mt-1">
-          <div class="col-md-6">
-            <label class="form-label">Responsável pelo Preenchimento</label>
-            <input type="text" name="responsavel_preenchimento" class="form-control form-control-sm"
-                   value="{{ atividade.responsavel_preenchimento if atividade else '' }}"
-                   placeholder="Nome, matrícula, cargo e data">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Situação do Registro</label>
-            <select name="situacao" class="form-select form-select-sm">
-              {% for val, rotulo in SITUACOES %}
-              <option value="{{ val }}"
-                {% if (atividade.situacao if atividade else 'em_andamento') == val %}selected{% endif %}>
-                {{ rotulo }}
-              </option>
+        <div class="d-flex justify-content-end"><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
+      </div>
+
+      <!-- Etapa 2: Finalidade -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-bullseye"></i> Finalidade e Fundamentação <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.4)</span></h6>
+          <div class="mb-3"><label class="form-label">Finalidade <span class="req">*</span></label>
+            <textarea name="finalidade" class="form-control form-control-sm" rows="3" placeholder="Descreva o propósito concreto do tratamento..." required>{{ atividade.finalidade if atividade else '' }}</textarea></div>
+          <div class="mb-3"><label class="form-label">Base Legal <span class="req">*</span></label>
+            <select name="base_legal" class="form-select form-select-sm" required>
+              <option value="">— selecione —</option>
+              {% for codigo, descricao in BASES_LEGAIS.items() %}<option value="{{ codigo }}" {% if atividade and atividade.base_legal == codigo %}selected{% endif %}>{{ codigo }} – {{ descricao }}</option>{% endfor %}
+            </select></div>
+          <div class="mb-0"><label class="form-label">Previsão Normativa Específica</label>
+            <textarea name="previsao_normativa" class="form-control form-control-sm" rows="2" placeholder="Norma e artigos que fundamentam o tratamento...">{{ atividade.previsao_normativa if atividade else '' }}</textarea></div>
+        </div>
+        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
+      </div>
+
+      <!-- Etapa 3: Dados pessoais -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-person-vcard"></i> Dados Pessoais Tratados <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.2)</span></h6>
+          <div class="mb-3"><label class="form-label">Categorias de Titulares</label>
+            <input type="text" name="categorias_titulares" class="form-control form-control-sm" value="{{ atividade.categorias_titulares if atividade else '' }}" placeholder="Ex: servidores, cidadãos, candidatos, visitantes"></div>
+          <div class="mb-3"><label class="form-label">Estimativa de Titulares por Categoria</label>
+            <textarea name="titulares_estimativa" id="titulares_estimativa" class="form-control form-control-sm" rows="2" placeholder="Formato 'categoria: quantidade' por linha (ex: servidores: 2500)">{{ dict_estimativa_para_texto(atividade.titulares_estimativa) if atividade else '' }}</textarea>
+            <div class="form-text">Digite uma categoria por linha, no formato <code>categoria: quantidade</code>.</div></div>
+          <div class="mb-3"><label class="form-label">Titulares com Proteção Reforçada</label>
+            <div class="d-flex flex-wrap gap-3">
+              {% for cat in ['criancas','adolescentes','idosos','outros vulneráveis'] %}
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="titulares_protecao_reforcada" value="{{ cat }}" id="prot_{{ loop.index }}" {% if atividade and cat in parse_json(atividade.titulares_protecao_reforcada or '[]') %}checked{% endif %}><label class="form-check-label" for="prot_{{ loop.index }}" style="font-size:.82rem;">{{ cat|capitalize }}</label></div>
               {% endfor %}
-            </select>
-          </div>
-        </div>
-        {% if atividade %}
-        <div class="mt-2" style="font-size:0.75rem;color:#888;">
-          Versão atual: <strong>{{ atividade.versao or '1.0' }}</strong>
-          {% if atividade.situacao == 'em_andamento' %}
-            <span class="badge text-bg-warning text-dark ms-1">Em andamento</span>
-          {% endif %}
-        </div>
-        {% endif %}
-      </div>
-
-      <!-- Finalidade e fundamentação (Guia 4.4) -->
-      <div class="form-card">
-        <h6><i class="bi bi-gear me-1"></i> Finalidade e Fundamentação <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.4)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Finalidade <span class="req">*</span></label>
-          <textarea name="finalidade" class="form-control form-control-sm" rows="2"
-                    placeholder="Descreva o propósito concreto do tratamento..." required>{{ atividade.finalidade if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Base Legal <span class="req">*</span></label>
-          <select name="base_legal" class="form-select form-select-sm" required>
-            <option value="">— selecione —</option>
-            {% for codigo, descricao in BASES_LEGAIS.items() %}
-            <option value="{{ codigo }}"
-              {% if atividade and atividade.base_legal == codigo %}selected{% endif %}>
-              {{ codigo }} – {{ descricao }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="mb-0">
-          <label class="form-label">Previsão Normativa Específica</label>
-          <textarea name="previsao_normativa" class="form-control form-control-sm" rows="2"
-                    placeholder="Norma e artigos que fundamentam o tratamento (ex: Lei X, art. Y; Res. TRE-PR ...)">{{ atividade.previsao_normativa if atividade else '' }}</textarea>
-        </div>
-      </div>
-
-      <!-- Dados pessoais tratados (Guia 4.2) -->
-      <div class="form-card">
-        <h6><i class="bi bi-person-vcard me-1"></i> Dados Pessoais Tratados <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.2)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Categorias de Titulares</label>
-          <input type="text" name="categorias_titulares" class="form-control form-control-sm"
-                 value="{{ atividade.categorias_titulares if atividade else '' }}"
-                 placeholder="Ex: servidores, cidadãos, candidatos, visitantes">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Estimativa de Titulares por Categoria</label>
-          <textarea name="titulares_estimativa" class="form-control form-control-sm" rows="2"
-                    placeholder="Formato 'categoria: quantidade' por linha&#10;Ex:&#10;servidores: 2500&#10;cidadãos: 12000">{{ dict_estimativa_para_texto(atividade.titulares_estimativa) if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Titulares com Proteção Reforçada</label>
-          <div class="d-flex flex-wrap gap-3">
-            {% for cat in ['criancas','adolescentes','idosos','outros vulneráveis'] %}
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="titulares_protecao_reforcada"
-                     value="{{ cat }}" id="prot_{{ loop.index }}"
-                     {% if atividade and cat in parse_json(atividade.titulares_protecao_reforcada or '[]') %}checked{% endif %}>
-              <label class="form-check-label" for="prot_{{ loop.index }}" style="font-size:0.82rem;">{{ cat|capitalize }}</label>
+            </div></div>
+          <div class="mb-3"><label class="form-label">Tipos de Dados (resumo)</label>
+            <textarea name="categorias_dados" class="form-control form-control-sm" rows="2" placeholder="Ex: nome, CPF, e-mail, endereço...">{{ atividade.categorias_dados if atividade else '' }}</textarea></div>
+          <div class="mb-3"><label class="form-label">Tipos de Dados por Categoria (FCI-ANPD)</label>
+            <div class="d-flex gap-1 mb-1">
+              <select class="form-select form-select-sm" id="catTiposSel">
+                {% for key,label in CATEGORIAS_DADOS_FCI.items() %}<option value="{{ label }}">{{ label }}</option>{% endfor %}
+              </select>
+              <button type="button" class="btn btn-sm btn-tre-soft text-nowrap" onclick="appendCat('tipos_dados','catTiposSel')">+ Categoria</button>
             </div>
+            <textarea name="tipos_dados" id="tipos_dados" class="form-control form-control-sm" rows="3" placeholder="Formato 'Categoria: tipo1; tipo2' por linha">{{ dict_tipos_para_texto(atividade.tipos_dados) if atividade else '' }}</textarea>
+            <div class="form-text">Use o botão <strong>+ Categoria</strong> e preencha os tipos após os dois pontos.</div></div>
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="dados_sensiveis" id="dados_sensiveis" value="1" {% if atividade and atividade.dados_sensiveis %}checked{% endif %}><label class="form-check-label" for="dados_sensiveis" style="font-size:.82rem;">Envolve <strong>dados sensíveis</strong> (Art. 5º, II)</label></div>
+          <div class="mb-3"><label class="form-label">Tipos de Dados Sensíveis</label>
+            <div class="tag-input" data-target="tipos_dados_sensiveis"><input type="text" placeholder="Digite e pressione Enter para adicionar"></div>
+            <textarea name="tipos_dados_sensiveis" class="hidden-tags">{{ lista_para_texto(atividade.tipos_dados_sensiveis) if atividade else '' }}</textarea></div>
+          <div class="pt-2" style="border-top:1px dashed #ddd;">
+            <label class="form-label mb-2">Critérios de alto risco <small>(gatilho de RIPD — Res. CD/ANPD 2/2022)</small></label>
+            {% set labels = {'tecnologias_emergentes':'Tecnologias emergentes/inovadoras','decisoes_automatizadas':'Decisões unicamente automatizadas (perfilamento)','vigilancia_zonas_publicas':'Vigilância/controle de zonas acessíveis ao público'} %}
+            {% for f in ['tecnologias_emergentes','decisoes_automatizadas','vigilancia_zonas_publicas'] %}
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="{{ f }}" id="{{ f }}" value="1" {% if atividade and atividade[f] %}checked{% endif %}><label class="form-check-label" for="{{ f }}" style="font-size:.82rem;">{{ labels[f] }}</label></div>
             {% endfor %}
+            <div class="form-text mt-1">Sensíveis, crianças/idosos e larga escala são detectados automaticamente para o gatilho de RIPD.</div>
           </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Tipos de Dados (resumo)</label>
-          <textarea name="categorias_dados" class="form-control form-control-sm" rows="2"
-                    placeholder="Ex: nome, CPF, e-mail, endereço, dados bancários...">{{ atividade.categorias_dados if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Tipos de Dados por Categoria (taxonomia FCI-ANPD)</label>
-          <textarea name="tipos_dados" class="form-control form-control-sm" rows="3"
-                    placeholder="Formato 'Categoria: tipo1; tipo2; tipo3' por linha&#10;Categorias: {{ CATEGORIAS_DADOS_FCI.values()|join('; ') }}">{{ dict_tipos_para_texto(atividade.tipos_dados) if atividade else '' }}</textarea>
-        </div>
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="checkbox" name="dados_sensiveis"
-                 id="dados_sensiveis" value="1"
-                 {% if atividade and atividade.dados_sensiveis %}checked{% endif %}>
-          <label class="form-check-label" for="dados_sensiveis" style="font-size:0.82rem;">
-            Envolve <strong>dados sensíveis</strong> (Art. 5º, II LGPD)
-            <span style="font-size:0.72rem;color:#888;"> — biometria, saúde, origem racial, religião, etc.</span>
-          </label>
-        </div>
-        <div class="mb-0">
-          <label class="form-label">Quais Tipos de Dados Sensíveis</label>
-          <textarea name="tipos_dados_sensiveis" class="form-control form-control-sm" rows="2"
-                    placeholder="Um por linha: saúde, biometria facial, filiação sindical...">{{ lista_para_texto(atividade.tipos_dados_sensiveis) if atividade else '' }}</textarea>
-        </div>
-
-        <div class="mt-3 pt-2" style="border-top:1px dashed #ddd;">
-          <label class="form-label mb-2">
-            Critérios de alto risco <small>(gatilho de RIPD — Res. CD/ANPD nº 2/2022)</small>
-          </label>
-          {% set flags = ['tecnologias_emergentes','decisoes_automatizadas','vigilancia_zonas_publicas'] %}
-          {% set labels = {'tecnologias_emergentes':'Uso de tecnologias emergentes/inovadoras','decisoes_automatizadas':'Decisões unicamente automatizadas (perfilamento)','vigilancia_zonas_publicas':'Vigilância/controle de zonas acessíveis ao público'} %}
-          {% for f in flags %}
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="{{ f }}" id="{{ f }}" value="1"
-                   {% if atividade and atividade[f] %}checked{% endif %}>
-            <label class="form-check-label" for="{{ f }}" style="font-size:0.82rem;">{{ labels[f] }}</label>
-          </div>
-          {% endfor %}
-          <div style="font-size:0.72rem;color:#888;margin-top:0.3rem;">
-            Dados sensíveis, crianças/adolescentes/idosos e larga escala (estimativa de titulares) são detectados automaticamente para o gatilho de RIPD.
-          </div>
-        </div>
+        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
       </div>
 
-      <!-- Ciclo de vida dos dados (Guia 4.3) -->
-      <div class="form-card">
-        <h6><i class="bi bi-arrow-repeat me-1"></i> Ciclo de Vida dos Dados <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.3)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Descrição do Fluxo de Tratamento</label>
-          <textarea name="fluxo_tratamento" class="form-control form-control-sm" rows="3"
-                    placeholder="Como os dados são coletados, processados, armazenados, compartilhados e eliminados...">{{ atividade.fluxo_tratamento if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Origem dos Dados</label>
-          <textarea name="origem_dados" class="form-control form-control-sm" rows="2"
-                    placeholder="Um por linha: formulário do titular, outro sistema, base pública, terceiros...">{{ lista_para_texto(atividade.origem_dados) if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Local e Meio de Armazenamento</label>
-          <input type="text" name="local_armazenamento" class="form-control form-control-sm"
-                 value="{{ atividade.local_armazenamento if atividade else '' }}"
-                 placeholder="Ex: sistema corporativo X, base de dados Y, nuvem corporativa, arquivo físico">
-        </div>
-        <div class="row g-2">
-          <div class="col-md-6">
-            <label class="form-label">Prazo de Retenção</label>
-            <input type="text" name="prazo_retencao" class="form-control form-control-sm"
-                   value="{{ atividade.prazo_retencao if atividade else '' }}"
-                   placeholder="Ex: 5 anos após encerramento do vínculo">
+      <!-- Etapa 4: Ciclo de vida -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-arrow-repeat"></i> Ciclo de Vida dos Dados <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.3)</span></h6>
+          <div class="mb-3"><label class="form-label">Descrição do Fluxo de Tratamento</label>
+            <textarea name="fluxo_tratamento" class="form-control form-control-sm" rows="3" placeholder="Coleta → processamento → armazenamento → compartilhamento → eliminação">{{ atividade.fluxo_tratamento if atividade else '' }}</textarea></div>
+          <div class="mb-3"><label class="form-label">Origem dos Dados</label>
+            <div class="tag-input" data-target="origem_dados"><input type="text" placeholder="Ex: formulário do titular. Enter para adicionar"></div>
+            <textarea name="origem_dados" class="hidden-tags">{{ lista_para_texto(atividade.origem_dados) if atividade else '' }}</textarea></div>
+          <div class="mb-3"><label class="form-label">Local e Meio de Armazenamento</label>
+            <input type="text" name="local_armazenamento" class="form-control form-control-sm" value="{{ atividade.local_armazenamento if atividade else '' }}" placeholder="Ex: sistema corporativo X, nuvem corporativa, arquivo físico"></div>
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label">Prazo de Retenção</label><input type="text" name="prazo_retencao" class="form-control form-control-sm" value="{{ atividade.prazo_retencao if atividade else '' }}" placeholder="Ex: 5 anos após encerramento"></div>
+            <div class="col-md-6"><label class="form-label">Frequência do Tratamento</label><input type="text" name="frequencia_tratamento" class="form-control form-control-sm" value="{{ atividade.frequencia_tratamento if atividade else '' }}" placeholder="Ex: contínua, mensal, eventual"></div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">Frequência do Tratamento</label>
-            <input type="text" name="frequencia_tratamento" class="form-control form-control-sm"
-                   value="{{ atividade.frequencia_tratamento if atividade else '' }}"
-                   placeholder="Ex: contínua, mensal, eventual">
-          </div>
+          <div class="mt-2"><label class="form-label">Forma de Eliminação / Destinação Final</label>
+            <textarea name="eliminacao_destinacao" class="form-control form-control-sm" rows="2" placeholder="Ex: expurgo automático, anonimização, destruição física">{{ atividade.eliminacao_destinacao if atividade else '' }}</textarea></div>
         </div>
-        <div class="mt-2 mb-0">
-          <label class="form-label">Forma de Eliminação / Destinação Final</label>
-          <textarea name="eliminacao_destinacao" class="form-control form-control-sm" rows="2"
-                    placeholder="Ex: expurgo automático, anonimização, destruição física, preservação permanente...">{{ atividade.eliminacao_destinacao if atividade else '' }}</textarea>
-        </div>
+        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
       </div>
 
-      <!-- Agentes de tratamento (Guia 4.5) -->
-      <div class="form-card">
-        <h6><i class="bi bi-people me-1"></i> Agentes de Tratamento <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.5)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Controladores</label>
-          <textarea name="controladores" class="form-control form-control-sm" rows="2"
-                    placeholder="Razão social; CNPJ; responsabilidade (um por linha). Em regra, o próprio órgão público.">{{ lista_para_texto(atividade.controladores) if atividade else '' }}</textarea>
+      <!-- Etapa 5: Agentes -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-people"></i> Agentes de Tratamento <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.5)</span></h6>
+          <div class="mb-3"><label class="form-label">Controladores</label>
+            <div class="tag-input" data-target="controladores"><input type="text" placeholder="Razão social; CNPJ; responsabilidade. Enter para adicionar"></div>
+            <textarea name="controladores" class="hidden-tags">{{ lista_para_texto(atividade.controladores) if atividade else '' }}</textarea>
+            <div class="form-text">Em regra, o próprio órgão público é o controlador.</div></div>
+          <div class="mb-0"><label class="form-label">Operadores</label>
+            <div class="tag-input" data-target="operadores"><input type="text" placeholder="Razão social; CNPJ; instrumento. Enter para adicionar"></div>
+            <textarea name="operadores" class="hidden-tags">{{ lista_para_texto(atividade.operadores) if atividade else '' }}</textarea></div>
         </div>
-        <div class="mb-0">
-          <label class="form-label">Operadores</label>
-          <textarea name="operadores" class="form-control form-control-sm" rows="2"
-                    placeholder="Razão social; CNPJ; instrumento contratual (um por linha). Ex: fornecedor de hospedagem/desenvolvimento.">{{ lista_para_texto(atividade.operadores) if atividade else '' }}</textarea>
-        </div>
+        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
       </div>
 
-      <!-- Compartilhamento e transferência internacional (Guia 4.6) -->
-      <div class="form-card">
-        <h6><i class="bi bi-share me-1"></i> Compartilhamento e Transferência <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.6)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Compartilhamento / Destinatários</label>
-          <textarea name="destinatarios" class="form-control form-control-sm" rows="2"
-                    placeholder="Órgãos, sistemas ou terceiros com quem os dados são compartilhados...">{{ atividade.destinatarios if atividade else '' }}</textarea>
+      <!-- Etapa 6: Compartilhamento -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-share"></i> Compartilhamento e Transferência <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(4.6)</span></h6>
+          <div class="mb-3"><label class="form-label">Compartilhamento / Destinatários</label>
+            <textarea name="destinatarios" class="form-control form-control-sm" rows="2" placeholder="Órgãos, sistemas ou terceiros com quem os dados são compartilhados...">{{ atividade.destinatarios if atividade else '' }}</textarea></div>
+          <div class="mb-3"><label class="form-label">Compartilhamentos Detalhados</label>
+            <div class="tag-input" data-target="compartilhamentos"><input type="text" placeholder="Órgão/sistema; finalidade; base. Enter para adicionar"></div>
+            <textarea name="compartilhamentos" class="hidden-tags">{{ lista_para_texto(atividade.compartilhamentos) if atividade else '' }}</textarea></div>
+          <div class="mb-0"><label class="form-label">Transferência Internacional</label>
+            <div class="tag-input" data-target="transferencia_internacional"><input type="text" placeholder="país; destinatário; tipos; mecanismo. Enter para adicionar"></div>
+            <textarea name="transferencia_internacional" class="hidden-tags">{{ lista_para_texto(atividade.transferencia_internacional) if atividade else '' }}</textarea>
+            <div class="form-text">Deixe vazio se não houver transferência internacional.</div></div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Compartilhamentos Detalhados</label>
-          <textarea name="compartilhamentos" class="form-control form-control-sm" rows="2"
-                    placeholder="Órgão/sistema; finalidade; base legal (um por linha)">{{ lista_para_texto(atividade.compartilhamentos) if atividade else '' }}</textarea>
-        </div>
-        <div class="mb-0">
-          <label class="form-label">Transferência Internacional</label>
-          <textarea name="transferencia_internacional" class="form-control form-control-sm" rows="2"
-                    placeholder="país; destinatário; tipos; mecanismo (um por linha). Deixe vazio se não houver.">{{ lista_para_texto(atividade.transferencia_internacional) if atividade else '' }}</textarea>
-        </div>
+        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button><button type="button" class="btn btn-tre" data-next>Próximo <i class="bi bi-arrow-right"></i></button></div>
       </div>
 
-      <!-- Retenção e Segurança -->
-      <div class="form-card">
-        <h6><i class="bi bi-lock me-1"></i> Segurança <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(Art. 46 LGPD)</span></h6>
-        <div class="mb-3">
-          <label class="form-label">Medidas de Segurança <small>(Art. 46 LGPD)</small></label>
-          <textarea name="medidas_seguranca" class="form-control form-control-sm" rows="2"
-                    placeholder="Controle de acesso, criptografia, logs de auditoria...">{{ atividade.medidas_seguranca if atividade else '' }}</textarea>
+      <!-- Etapa 7: Segurança -->
+      <div class="wiz-step" style="display:none;">
+        <div class="form-card">
+          <h6><i class="bi bi-lock"></i> Segurança <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;">(Art. 46 LGPD)</span></h6>
+          <div class="mb-3"><label class="form-label">Medidas de Segurança <small>(Art. 46)</small></label>
+            <textarea name="medidas_seguranca" class="form-control form-control-sm" rows="3" placeholder="Controle de acesso, criptografia, logs de auditoria...">{{ atividade.medidas_seguranca if atividade else '' }}</textarea></div>
+          <div class="mb-0"><label class="form-label">Observações</label>
+            <textarea name="observacoes" class="form-control form-control-sm" rows="2" placeholder="Informações adicionais relevantes...">{{ atividade.observacoes if atividade else '' }}</textarea></div>
         </div>
-        <div class="mb-0">
-          <label class="form-label">Observações</label>
-          <textarea name="observacoes" class="form-control form-control-sm" rows="2"
-                    placeholder="Informações adicionais relevantes...">{{ atividade.observacoes if atividade else '' }}</textarea>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Voltar</button>
+          <button type="submit" class="btn btn-tre"><i class="bi bi-check-lg"></i> {% if atividade %}Salvar Alterações{% else %}Criar Atividade{% endif %}</button>
         </div>
       </div>
 
     </div>
 
-    <!-- Sidebar -->
-    <div class="col-lg-4">
-      <div class="form-card sticky-top" style="top:72px;">
-        <h6><i class="bi bi-info-circle me-1"></i> Referências PPSI 2.0 / LGPD</h6>
-        <ul style="font-size:0.75rem;color:#666;padding-left:1rem;margin:0;">
-          <li class="mb-1"><strong>Controle 19</strong> — Registro das operações de tratamento (PPSI 2.0)</li>
-          <li class="mb-1"><strong>Art. 37</strong> — Registro obrigatório de atividades de tratamento</li>
-          <li class="mb-1"><strong>Art. 46</strong> — Medidas técnicas e administrativas de segurança</li>
-          <li class="mb-1"><strong>Art. 7º / 11</strong> — Bases legais (dados gerais e sensíveis)</li>
-          <li><strong>FCI-ANPD</strong> — Taxonomia de tipos de dados compatível com o Formulário de Incidente</li>
+    <!-- Sidebar de ajuda -->
+    <div class="col-lg-3">
+      <div class="card-ro p-3 sticky-top" style="top:72px;">
+        <h6 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);font-weight:800;margin-bottom:.6rem;"><i class="bi bi-info-circle"></i> Referências PPSI 2.0 / LGPD</h6>
+        <ul style="font-size:.75rem;color:var(--muted);padding-left:1rem;margin:0;">
+          <li class="mb-1"><strong>Controle 19</strong> — registro das operações (ROPA)</li>
+          <li class="mb-1"><strong>Art. 37</strong> — registro obrigatório</li>
+          <li class="mb-1"><strong>Art. 46</strong> — medidas de segurança</li>
+          <li class="mb-1"><strong>Art. 7º / 11</strong> — bases legais</li>
+          <li><strong>FCI-ANPD</strong> — taxonomia de tipos de dados</li>
         </ul>
-
-        <hr style="border-color:#eee;">
-        <div style="font-size:0.72rem;color:#aaa;margin-bottom:1rem;">
-          Campos marcados com <span style="color:#dc3545;">*</span> são obrigatórios para completude mínima.
-          Conteúdo conforme <em>Guia para Elaboração do Registro das Operações de Tratamento</em> (PPSI 2.0).
-        </div>
-
-        <div class="d-grid gap-2">
-          <button type="submit" class="btn btn-tre">
-            <i class="bi bi-check-lg me-1"></i>
-            {% if atividade %}Salvar Alterações{% else %}Criar Atividade{% endif %}
-          </button>
-          <a href="{{ url_for('listar') }}" class="btn btn-outline-secondary btn-sm">
-            Cancelar
-          </a>
-        </div>
+        <hr style="border-color:var(--border);">
+        <div style="font-size:.72rem;color:var(--muted);">Conteúdo conforme <em>Guia do ROPA</em> (PPSI 2.0). Campos <span style="color:var(--danger);">*</span> são obrigatórios.</div>
       </div>
     </div>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Wizard
+  const steps = document.querySelectorAll('.wiz-step');
+  const dots = document.querySelectorAll('.stepper .step');
+  const bar = document.getElementById('wizProgress');
+  let cur = 0;
+  function show(n){
+    cur = Math.max(0, Math.min(n, steps.length-1));
+    steps.forEach((s,i)=> s.style.display = i===cur ? '' : 'none');
+    dots.forEach((d,i)=>{ d.classList.toggle('active', i===cur); d.classList.toggle('done', i<cur); });
+    bar.style.width = ((cur+1)/steps.length*100)+'%';
+    dots[cur].scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
+  }
+  function validStep(n){
+    const els = steps[n].querySelectorAll('[required]');
+    for(const el of els){ if(!(el.value||'').trim()){ el.reportValidity(); return false; } }
+    return true;
+  }
+  document.querySelectorAll('[data-next]').forEach(b=>b.addEventListener('click',()=>{ if(validStep(cur)) show(cur+1); }));
+  document.querySelectorAll('[data-prev]').forEach(b=>b.addEventListener('click',()=>show(cur-1)));
+
+  // Tag inputs
+  function initTag(el){
+    const hidden = document.getElementById(el.dataset.target);
+    const input = el.querySelector('input');
+    function sync(){
+      const tags=[...el.querySelectorAll('.chip')].map(c=>c.childNodes[0].textContent.trim());
+      hidden.value=tags.join('\n');
+    }
+    function addChip(text,persist=true){
+      text=(text||'').trim(); if(!text) return;
+      const c=document.createElement('span'); c.className='chip';
+      c.appendChild(document.createTextNode(text));
+      const x=document.createElement('span'); x.className='x'; x.textContent='×';
+      x.onclick=()=>{ c.remove(); sync(); };
+      c.appendChild(x);
+      el.insertBefore(c, input);
+      if(persist) sync();
+    }
+    function render(){ (hidden.value||'').split('\n').filter(t=>t.trim()).forEach(t=>addChip(t,false)); sync(); }
+    input.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter'||e.key===','){ e.preventDefault(); addChip(input.value); input.value=''; }
+      else if(e.key==='Backspace' && !input.value){
+        const cs=el.querySelectorAll('.chip'); if(cs.length){ cs[cs.length-1].remove(); sync(); }
+      }
+    });
+    input.addEventListener('blur',()=>{ if(input.value){ addChip(input.value); input.value=''; } });
+    render();
+  }
+  document.querySelectorAll('.tag-input').forEach(initTag);
+
+  function appendCat(taId, selId){
+    const ta=document.getElementById(taId); const cat=document.getElementById(selId).value;
+    const line=cat+': ';
+    ta.value = ta.value ? ta.value+'\n'+line : line;
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+  show(0);
+</script>
 {% endblock %}

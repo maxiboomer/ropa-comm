@@ -3,79 +3,81 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Stat cards -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-card d-flex align-items-center gap-3">
-      <i class="bi bi-journal-text text-primary"></i>
-      <div>
-        <div class="stat-value">{{ registros|length }}</div>
-        <div class="stat-label">Atividades</div>
+<!-- Alertas de ação -->
+{% if alertas %}
+<div class="row g-2 mb-3">
+  {% for a in alertas %}
+  <div class="col-md-6 col-lg-4">
+    <a href="{{ a.url }}" class="text-decoration-none">
+      <div class="alert-card {{ a.tipo }}">
+        <div class="ic {{ a.tipo }}"><i class="bi {{ a.icone }}"></i></div>
+        <div class="at-body">
+          <div class="at-t">{{ a.titulo }}</div>
+          <div class="at-s">{{ a.sub }}</div>
+        </div>
+        <i class="bi bi-chevron-right" style="color:var(--muted);"></i>
       </div>
-    </div>
+    </a>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card d-flex align-items-center gap-3">
-      <i class="bi bi-patch-check text-success"></i>
-      <div>
-        <div class="stat-value">{{ completos }}</div>
-        <div class="stat-label">Completas ≥ 80%</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card d-flex align-items-center gap-3">
-      <i class="bi bi-shield-exclamation text-danger"></i>
-      <div>
-        <div class="stat-value">{{ sensiveis }}</div>
-        <div class="stat-label">Dados Sensíveis</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card d-flex align-items-center gap-3">
-      <i class="bi bi-bar-chart text-warning"></i>
-      <div>
-        <div class="stat-value">{{ "%.0f"|format(media) }}%</div>
-        <div class="stat-label">Completude Média</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Barra média geral -->
-{% if registros %}
-<div class="bg-white border rounded p-3 mb-4" style="border-color: var(--tre-borda) !important;">
-  <div class="d-flex justify-content-between align-items-center mb-1">
-    <span style="font-size:0.8rem;font-weight:600;color:#555;">Completude geral do RoPA</span>
-    <span style="font-size:0.8rem;font-weight:700;color:var(--tre-azul);">{{ "%.1f"|format(media) }}%</span>
-  </div>
-  <div class="progress" style="height:10px;">
-    <div class="progress-bar bg-{{ 'success' if media >= 80 else ('warning' if media >= 50 else 'danger') }}"
-         style="width:{{ media }}%"></div>
-  </div>
-  <div class="mt-2" style="font-size:0.75rem;color:#888;">
-    {{ completos }} de {{ registros|length }} atividade(s) com completude ≥ 80% · conforme LGPD Art. 37
-  </div>
+  {% endfor %}
 </div>
 {% endif %}
 
-<!-- Tabela resumo -->
-<div class="bg-white border rounded" style="border-color: var(--tre-borda) !important;">
-  <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
-    <span style="font-size:0.8rem;font-weight:700;color:var(--tre-azul);">
-      <i class="bi bi-list-ul me-1"></i> Atividades de Tratamento
-    </span>
-    {% if not registros %}
-    <form action="{{ url_for('seed') }}" method="post">
-      <button class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-database-add"></i> Carregar exemplos
-      </button>
-    </form>
-    {% endif %}
+<!-- KPIs -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <i class="bi bi-diagram-3 stat-icon"></i>
+      <div class="stat-value">{{ registros|length }}</div>
+      <div class="stat-label">Atividades</div>
+    </div>
   </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <i class="bi bi-check2-circle stat-icon" style="color:var(--success);"></i>
+      <div class="stat-value" style="color:var(--success);">{{ completos }}</div>
+      <div class="stat-label">Completas ≥ 80%</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <i class="bi bi-shield-lock stat-icon" style="color:var(--danger);"></i>
+      <div class="stat-value" style="color:var(--danger);">{{ sensiveis }}</div>
+      <div class="stat-label">Dados sensíveis</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <i class="bi bi-graph-up stat-icon" style="color:var(--brand-2);"></i>
+      <div class="stat-value" style="color:var(--brand-2);">{{ media|round }}%</div>
+      <div class="stat-label">Completude média</div>
+      <div class="stat-sub">{{ completos }} de {{ registros|length }} ≥ 80% · LGPD Art. 37</div>
+    </div>
+  </div>
+</div>
 
-  {% if registros %}
+<!-- Gráficos -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="card-ro p-3">
+      <h6 class="sec-tit" style="margin-top:0;">Completude por Unidade</h6>
+      <canvas id="chartUnidades" height="180"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card-ro p-3">
+      <h6 class="sec-tit" style="margin-top:0;">Distribuição por Base Legal</h6>
+      <canvas id="chartBases" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card-ro">
+  <div class="d-flex justify-content-between align-items-center p-3 pb-0">
+    <h6 class="sec-tit" style="margin:0;">Atividades de Tratamento</h6>
+    <a href="{{ url_for('listar') }}" class="btn btn-sm btn-tre-soft">Ver todas <i class="bi bi-arrow-right"></i></a>
+  </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0">
       <thead>
@@ -84,70 +86,74 @@
           <th>Atividade</th>
           <th>Base Legal</th>
           <th style="width:90px">Sensível</th>
-          <th style="width:160px">Completude</th>
-          <th style="width:110px">Atualizado</th>
-          <th style="width:80px"></th>
+          <th style="width:150px">Completude</th>
+          <th style="width:120px">RIPD</th>
+          <th style="width:100px"></th>
         </tr>
       </thead>
       <tbody>
         {% for r in registros %}
         {% set score, _ = pontuacao(r) %}
+        {% set _rc = calcular_risco(r) %}
+        {% set _st = ripd_status.get(r.id) if ripd_status is defined else None %}
         <tr>
           <td class="text-muted">{{ r.id }}</td>
           <td>
-            <a href="{{ url_for('ver', atividade_id=r.id) }}"
-               style="color:var(--tre-azul);font-weight:600;text-decoration:none;">
-              {{ r.nome_atividade }}
-            </a>
-            {% if r.unidade_controladora %}
-              <div style="font-size:0.72rem;color:#aaa;">{{ r.unidade_controladora }}</div>
-            {% endif %}
+            <a href="{{ url_for('ver', atividade_id=r.id) }}" style="color:var(--brand);font-weight:600;text-decoration:none;">{{ r.nome_atividade }}</a>
+            <div style="font-size:.74rem;color:var(--muted);">{{ r.unidade_controladora or '' }}</div>
           </td>
           <td>
-            {% if r.base_legal %}
-              <span class="badge text-bg-light text-dark">{{ r.base_legal }}</span>
-            {% else %}
-              <span class="text-muted">—</span>
-            {% endif %}
+            {% if r.base_legal %}<span class="badge badge-soft" title="{{ BASES_LEGAIS.get(r.base_legal,'') }}">{{ r.base_legal }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
           <td>
-            {% if r.dados_sensiveis %}
-              <span class="badge-sensivel">Sim</span>
-            {% else %}
-              <span class="text-muted" style="font-size:0.8rem;">Não</span>
-            {% endif %}
+            {% if r.dados_sensiveis %}<span class="badge-sensivel"><i class="bi bi-shield-exclamation"></i> Sim</span>{% else %}<span class="text-muted" style="font-size:.8rem;">Não</span>{% endif %}
           </td>
           <td>
             <div class="score-block">
-              <div class="progress" style="flex:1;height:5px;">
-                <div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div>
-              </div>
-              <span style="font-size:0.75rem;font-weight:600;color:{{ '#198754' if score >= 80 else ('#ffc107' if score >= 50 else '#dc3545') }}">
-                {{ score }}%
-              </span>
+              <div class="progress" style="flex:1;height:5px;"><div class="progress-bar bg-{{ score_class(score) }}" style="width:{{ score }}%"></div></div>
+              <span style="font-size:.75rem;font-weight:700;color:{{ '#198754' if score>=80 else ('#fd7e14' if score>=50 else '#dc3545') }}">{{ score }}%</span>
             </div>
           </td>
-          <td style="font-size:0.75rem;color:#aaa;">
-            {{ (r.atualizado_em or '')[:10] }}
+          <td style="font-size:.72rem;">
+            {% set _st = ripd_status.get(r.id) %}
+            {% if _st %}
+              <span class="badge {{ {'aprovado':'text-bg-success','publicado':'text-bg-success','desatualizado':'text-bg-danger','rascunho':'text-bg-secondary','em_revisao':'text-bg-warning text-dark'}.get(_st,'text-bg-secondary') }}">{{ {'aprovado':'RIPD aprovado','publicado':'RIPD publicado','desatualizado':'RIPD revisar','rascunho':'RIPD rascunho','em_revisao':'RIPD revisão'}.get(_st,_st) }}</span>
+            {% elif _rc.recomenda %}<span class="badge text-bg-warning text-dark">⚠ RIPD</span>{% else %}<span class="text-muted">—</span>{% endif %}
           </td>
           <td>
-            <a href="{{ url_for('ver', atividade_id=r.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2">
-              Ver
-            </a>
+            <a href="{{ url_for('ver', atividade_id=r.id) }}" class="btn btn-sm btn-tre-soft py-0 px-2">Ver</a>
+            <a href="{{ url_for('editar', atividade_id=r.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2">Editar</a>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% else %}
-  <div class="text-center py-5 text-muted">
-    <i class="bi bi-journal-x" style="font-size:2rem;"></i>
-    <p class="mt-2 mb-0">Nenhuma atividade registrada.</p>
-    <a href="{{ url_for('nova') }}" class="btn btn-tre btn-sm mt-3">
-      <i class="bi bi-plus"></i> Criar primeira atividade
-    </a>
-  </div>
-  {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  {% if chart_unidades %}
+  new Chart(document.getElementById('chartUnidades'), {
+    type: 'bar',
+    data: { labels: {{ chart_unidades|map(attribute='label')|list|tojson }},
+      datasets: [{ label: 'Completude média (%)',
+        data: {{ chart_unidades|map(attribute='media')|list|tojson }},
+        backgroundColor: '#2B57A6', borderRadius: 6, maxBarThickness: 42 }] },
+    options: { scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } },
+      maintainAspectRatio: false }
+  });
+  {% endif %}
+  {% if chart_bases %}
+  new Chart(document.getElementById('chartBases'), {
+    type: 'doughnut',
+    data: { labels: {{ chart_bases|map(attribute='label')|list|tojson }},
+      datasets: [{ data: {{ chart_bases|map(attribute='qtd')|list|tojson }},
+        backgroundColor: ['#1F3D7A','#2B57A6','#5B8DEF','#E9A11B','#1d7a4f','#7a5b8d'] }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      maintainAspectRatio: false }
+  });
+  {% endif %}
+</script>
 {% endblock %}

@@ -408,13 +408,55 @@ def index():
     media = sum(scores) / len(scores) if scores else 0
     completos = sum(1 for s in scores if s >= 80)
     sensiveis = sum(1 for r in registros if r.get("dados_sensiveis"))
+
+    # Ripd status por atividade
+    ripd_status = {}
+    with get_conn() as conn:
+        for row in conn.execute("SELECT atividade_id, situacao FROM ripds"):
+            ripd_status[row["atividade_id"]] = row["situacao"]
+
+    # Distribuição por unidade (completude média) e base legal
+    por_unidade = {}
+    por_base = {}
+    for r in registros:
+        sc = pontuacao(r)[0]
+        u = r.get("unidade_controladora") or "Sem unidade"
+        por_unidade.setdefault(u, []).append(sc)
+        bl = r.get("base_legal") or "—"
+        por_base[bl] = por_base.get(bl, 0) + 1
+
+    chart_unidades = [{"label": k, "media": round(sum(v) / len(v))} for k, v in por_unidade.items()]
+    chart_bases = [{"label": k, "qtd": v} for k, v in por_base.items()]
+
+    # Alertas de ação
+    alertas = []
+    abaixo = [r for r in registros if pontuacao(r)[0] < 80]
+    if abaixo:
+        alertas.append({"tipo": "danger", "icone": "bi-exclamation-triangle",
+                        "titulo": f"{len(abaixo)} registro(s) abaixo de 80% de completude",
+                        "sub": "Priorize o preenchimento destes registros.", "url": url_for("validar")})
+    ripd_recomendados = []
+    ripd_desatualizados = []
+    for r in registros:
+        rc = calcular_risco(r)
+        st = ripd_status.get(r["id"])
+        if rc["recomenda"] and not st:
+            ripd_recomendados.append(r)
+        if st == "desatualizado":
+            ripd_desatualizados.append(r)
+    if ripd_desatualizados:
+        alertas.append({"tipo": "danger", "icone": "bi-arrow-repeat",
+                        "titulo": f"{len(ripd_desatualizados)} RIPD(s) desatualizado(s) — revisar",
+                        "sub": "A atividade vinculada mudou; o RIPD precisa de revisão.", "url": url_for("listar")})
+    if ripd_recomendados:
+        alertas.append({"tipo": "warn", "icone": "bi-file-earmark-text",
+                        "titulo": f"{len(ripd_recomendados)} operação(ões) com RIPD recomendado",
+                        "sub": "Indício de alto risco — elabore o RIPD (controle 23.3).", "url": url_for("listar")})
+
     return render_template(
         "index.html",
-        registros=registros,
-        scores=scores,
-        media=media,
-        completos=completos,
-        sensiveis=sensiveis,
+        registros=registros, scores=scores, media=media, completos=completos, sensiveis=sensiveis,
+        chart_unidades=chart_unidades, chart_bases=chart_bases, alertas=alertas, ripd_status=ripd_status,
     )
 
 
